@@ -29,8 +29,54 @@ OPERATIONS = {
 		'DESP' : 0b11111110
 }
 
+class AddressOutOfBoundsException(Exception):
+	pass
 
 
+
+# basic object to represent the memory in the MIC
+class MicMemory(object):
+	MEM_SIZE = 4096
+
+	def __init__(self,data):
+		if len(data) > MicMemory.MEM_SIZE:
+			raise AddressOutOfBoundsException("Size exceeds available memory of the Mic")
+
+		# data that is loaded in "by default"
+		self.data = data
+
+		self.original = {}
+
+
+	def reset(self):
+		
+		for addr in self.original:
+			self.data[addr] = self.original[addr]
+
+		# overlay is things we have changed 
+		# this prevents modification of the memory itself
+		# so we can start over without reloading anything.
+		self.original = {}
+
+	def __getitem__(self,addr):
+		if addr >= MicMemory.MEM_SIZE:
+			raise AddressOutOfBoundsException("memory adress out of bounds")
+
+		return self.data[addr]
+
+	def __setitem__(self,addr,data):
+
+		if addr >= MicMemory.MEM_SIZE:
+			raise AddressOutofBoundsException("memory address out of bounds")
+
+		# create a backup.
+		self.original[addr] = self.data[addr]
+
+		
+		self.data[addr] = data
+
+	
+		
 class Mic(object):
 
 	def __init__(self):
@@ -38,46 +84,45 @@ class Mic(object):
 
 	def reset(self):
 			self.pc = 0
-			self.sp = 0
+			self.sp = None
 			self.ac = None
 			self.data = None
 			self.stack = []
+			self.end = False
 
 	def load(self,data):
 
 		# @todo out of memory
 		self.data = data
-
 	
-	def get_mem_data(self,addr):
-		if addr >= len(self.data):
-			raise Exception("memory location out-of-bounds")
 
-		return self.data[addr]
+	def run(self, limit = None):
 
-	def set_mem_data(self,addr,data):
-		if  addr > 4095:
-			raise Exception("Memory adress out of bounds")
+		if self.end:
+			raise Exception("Program completed")
+		
+			# Todo limit.
+		while self.end is False:
+			self.step()
 
-		self.data[addr] = data
+	def step(self):
 
-	def run(self):
+		if self.end:
+			raise Exception("Program completed")
+
 		pc = self.pc
 
 		# in the default case, increment  pc by 1.
 		self.pc += 1
 
-		
-		instruction = self.get_mem_data(pc)
+		try:
+			instruction = self.data[pc]
+		except AddressOutOfBoundsException :
+			raise AddresOutOfBoundsException("Memory address PC = %04x out of bounds while trying to fetch next instruction." % pc)
 
 		arg = instruction&0xff
 		op = (instruction>>8)&0xff
-
-		# no operation in this cell...
-		if op == 0:
-			raise Exception("No-Op")
-
-		
+	
 		# try to get the textual version of the oepration:
 		
 		op_name = None
@@ -93,27 +138,33 @@ class Mic(object):
 
 		
 		if op_name == 'LODD':
-			self.ac = self.get_mem_data(arg)
+			self.ac = self.data[arg]
 
 		elif op_name == 'STOD':
 			if self.ac is  None:
 				raise Exception("Trying to STOD with a null AC???")
 
 			
-			self.set_mem_data(arg,self.ac)
+			self.data[arg,self.ac]
 
 		elif op_name == 'LOCO':
 			self.ac = arg
 
 		elif op_name == 'ADDD':
-			self.ac += self.get_mem_data(arg)
+			self.ac += self.data[arg]
 
 		elif op_name == 'SUBD':
-			self.ac -= self.get_mem_data(arg)
+			self.ac -= self.data[arg]
 
 			
 		elif op_name == 'JUMP':
+				
+			#trying to jump to current instruction = stop
+			if self.pc == arg:
+				self.end = True
+				
 			self.pc = arg
+	
 
 		elif op_name == 'JZER':
 			if self.ac == 0:
@@ -251,7 +302,7 @@ for line in sys.stdin:
 	N += 1
 #	line = line.strip()
 
-	print "%3d     %s" % (N,line),
+	print("%3d     %s" % (N,line)),
 
 	#comments and blanks...
 	if line.strip().startswith(';') or len(line.strip()) == 0:
@@ -262,8 +313,8 @@ for line in sys.stdin:
 		# else it is an instruction
 		(label,ins,arg) = line.split("\t")
 	except (ValueError):
-		print "Epic fail parsing line: "
-		print line
+		print("Epic fail parsing line: ")
+		print(line)
 		exit();
 		
 
@@ -289,13 +340,13 @@ for line in sys.stdin:
 #	label = ''
 
 
-print "-----------------------------------------"
+print("-----------------------------------------")
 #print labels
 data = []
 for line in lines:
 
 	if line.type in (Line.TYPE_CMT, Line.TYPE_WHT):
-		print line.data
+		print(line.data)
 
 	elif line.type == Line.TYPE_INS:
 		ins = line.data
@@ -317,9 +368,9 @@ for line in lines:
 
 mic = Mic()
 
-mic.load(data)
+mic.load(MicMemory(data))
 
 mic.run()
 
-print mic.data[0x23], mic.ac
+print(mic.data[0x23], mic.ac)
 
