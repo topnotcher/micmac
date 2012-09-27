@@ -2,7 +2,7 @@
 
 import sys
 
-ins_set = {
+OPERATIONS = {
 		'LODD' : 0b00000000 , 
 		'STOD' : 0b00010000 ,
 		'LOCO' : 0b01110000 ,
@@ -32,8 +32,6 @@ ins_set = {
 
 
 class Mic(object):
-
-	
 
 	def __init__(self):
 		self.reset()
@@ -84,8 +82,8 @@ class Mic(object):
 		
 		op_name = None
 
-		for ins_name in ins_set:
-			if ins_set[ins_name] == op:
+		for ins_name in OPERATIONS:
+			if OPERATIONS[ins_name] == op:
 				op_name = ins_name
 				break
 
@@ -188,7 +186,7 @@ class Mic(object):
 
 
 
-ins_set = {
+OPERATIONS = {
 		'LODD' : 0b00000000 , 
 		'STOD' : 0b00010000 ,
 		'LOCO' : 0b01110000 ,
@@ -277,14 +275,14 @@ for line in sys.stdin:
 	else:
 		label = None
 
-	if ins not in ins_set:
+	if ins not in OPERATIONS:
 		raise Exception("Unknown instruction: '" + ins + "'")
 
 	
 	lines.append( Line(Line.TYPE_INS, Instruction(i,label,ins,arg) ))
 
 	#addr, instruction, label, instruction, arg
-#	print("%03x %1x%03x %-20s %4s %s" % (i, ins_set[ins], 0, label, ins, arg));
+#	print("%03x %1x%03x %-20s %4s %s" % (i, OPERATIONS[ins], 0, label, ins, arg));
 
 
 	i += 1
@@ -310,7 +308,7 @@ for line in lines:
 		else:
 			argN = int(ins.arg)
 
-		ins_enc = ((ins_set[ins.ins]&0xFF) << 8) | (argN&0xFF);
+		ins_enc = ((OPERATIONS[ins.ins]&0xFF) << 8) | (argN&0xFF);
 
 		data.append(ins_enc)
 
