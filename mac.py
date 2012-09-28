@@ -23,6 +23,9 @@ class UndefinedOperationException(MacException):
 class Mac(object):
 	OPERATIONS = {
 			'LODD' : 0b00000000 , 
+
+			 # placeholder for defining variables
+			'DEFN' : 0b00000000 ,
 			'STOD' : 0b00010000 ,
 			'LOCO' : 0b01110000 ,
 			'ADDD' : 0b00100000 ,
@@ -68,7 +71,9 @@ class Mac(object):
 
 		# other opartions. The op is 4 bits, arg 12.
 		else:
-			return (op&0xf0)<<8 | (arg&0xfff)
+			# dont mask arg because in the case of a defined constant,
+			# the data is the whole thing. 
+			return (op&0xf0)<<8 | (arg)
 
 	
 	def dasm_op(instruction):
@@ -376,6 +381,12 @@ class MicProgram(object):
 
 		return self.syms[name]
 	
+	def sym_lookup_reverse(self,addr):
+		for name in self.syms:
+			if self.syms[name] == addr:
+				return name
+		return None
+
 	def add_line(self,line):
 		self.lines.append(line)
 		
@@ -390,6 +401,10 @@ class MicProgram(object):
 
 		# othwise, return none
 		return None
+
+	def line_addr_lookup(self,line):
+		return self.mmap.index(line.n - 1)
+
 
 	def get_line(self,line):
 		return self.lines[line]
@@ -566,6 +581,20 @@ class MacAsm(object):
 			self.next_label = None
 
 
+def print_baudet(pgm,line):
+		if line.op is None:
+			print(line.txt)
+		else:
+			addr = pgm.line_addr_lookup(line)
+			sym = pgm.sym_lookup_reverse(addr)
+
+			if sym == None:
+				sym = ''
+			
+			# disaseembly can be sketchy, so we just add the text to the end.
+			print("%03x %04x %-20s %s" % (addr, line.op, sym, line.txt))
+
+
 
 if __name__ == '__main__':
 	print("the mother-fucking main")
@@ -589,7 +618,8 @@ if __name__ == '__main__':
 	while not mic.end: 
 
 		try:
-			print(" > " + pgm.get_line_by_addr(mic.pc).txt)
+			#print(" > " + pgm.get_line_by_addr(mic.pc).txt)
+			print_baudet(pgm,pgm.get_line_by_addr(mic.pc))
 
 			mic.step()
 		except MicMacException as e:
