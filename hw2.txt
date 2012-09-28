@@ -1,4 +1,5 @@
-Main:	LODD	N
+Main:
+	LODD	N
 
 	; assume that input n>=1. (n==0 should return 0. < 0 is undefined)
 	; N -= 2
@@ -9,9 +10,13 @@ Main:	LODD	N
 	JNEG	Stop
 
 
-; similarly: f(2) = 1. 
-; Also handlers when N decrements sufficiently 
-fibonacci:	LODD	N
+fibonacci:	
+
+	; similarly: f(2) = 1. 
+	; Also handles when N decrements sufficiently 
+
+	LODD	N
+
 	JZER	Stop
 
 	; load f0 into AC
@@ -40,16 +45,16 @@ fibonacci:	LODD	N
 
 Stop:	JUMP	Stop
 
-two:	LODD	2
-one:	LODD	1
+two:	DEFN	2
+one:	DEFN	1
 
 ; Previous two elements in the sequence
-f0:	LODD	1
-f1:	LODD	1
+f0:	DEFN	1
+f1:	DEFN	1
 
 ; Input
-N:	LODD	10
+N:	DEFN	10
 
 ; result of f(n)
-Result:	LODD	1
+Result:	DEFN	1
 
