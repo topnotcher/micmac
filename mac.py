@@ -2,6 +2,24 @@
 
 import sys
 
+class MicMacException(Exception):
+	pass
+
+class MacException(MicMacException):
+	pass
+
+class NamespaceException(MacException):
+	pass
+
+class UndefinedLabelException(MacException):
+	pass
+
+class MacAssemblerException(MacException):
+	pass
+
+class UndefinedOperationException(MacException):
+	pass
+
 class Mac(object):
 	OPERATIONS = {
 			'LODD' : 0b00000000 , 
@@ -38,7 +56,7 @@ class Mac(object):
 
 	def get_code(name):
 		if name not in Mac.OPERATIONS:
-			return None
+			raise UndefinedOperationException("Undefined operation: %s" % (name))
 
 		return Mac.OPERATIONS[name]
 
@@ -50,11 +68,10 @@ class Mac(object):
 
 		# other opartions. The op is 4 bits, arg 12.
 		else:
-			return (op&0xf)<<8 | (arg&0xfff)
+			return (op&0xf0)<<8 | (arg&0xfff)
 
 	
 	def dasm_op(instruction):
-
 		# stack op.
 		if ((instruction & 0xf000) >> 12) == 0b1111:
 			return ( (instruction&0xff00)>>8, instruction&0xff )
@@ -63,12 +80,11 @@ class Mac(object):
 		else:
 			return ( (instruction&0xf000)>>8, instruction&0xfff )
 
-class MicException(Exception):
+class MicException(MicMacException):
 	pass
 
 class NumberOverflowException(MicException):
 	pass
-
 class AddressOutOfBoundsException(MicException):
 	pass
 
@@ -108,7 +124,7 @@ class MicMemory(object):
 
 	def __getitem__(self,addr):
 		if addr >= MicMemory.MEM_SIZE:
-			raise AddressOutOfBoundsException("memory adress out of bounds")
+			raise AddressOutOfBoundsException("memory adress out of bounds 0x%04x >= 0x%04x " % (addr, MicMemory.MEM_SIZE))
 
 		if addr in self.overlay:
 			return self.overlay[addr]
@@ -118,10 +134,10 @@ class MicMemory(object):
 	def __setitem__(self,addr,data):
 
 		if addr >= MicMemory.MEM_SIZE:
-			raise AddressOutofBoundsException("memory address out of bounds")
+			raise AddressOutofBoundsException("memory address out of bounds. 0x%04x >= 0x%04x " % (addr, MicMemory.MEM_SIZE) )
 
 		if data > 0xffff:
-			raise NumberOverflowException("M[%d] = %d: value %d is out of bounds." % (addr,data,data)) 
+			raise NumberOverflowException("M[0x%04x] = %d: value %d is out of bounds." % (addr,data,data)) 
 
 		# create a backup.
 		self.overlay[addr] = data
@@ -141,7 +157,7 @@ class Mic(object):
 
 	def reset(self):
 			# program entry point is always addr 0
-			self.pc = -1
+			self.pc = 0
 
 			#start the stack pointer below the bottom of memory.
 			self.sp = MicMemory.MEM_SIZE
@@ -194,24 +210,19 @@ class Mic(object):
 		if self.end:
 			raise Exception("Program completed")
 
-		# in the default case, increment  pc by 1.
-		self.pc += 1
+		#self.pc += 1
 		pc =  self.pc
 
 		try:
 			instruction = self.data[pc]
-		except AddressOutOfBoundsException :
-			raise AddresOutOfBoundsException("Memory address PC = %04x out of bounds while trying to fetch next instruction." % pc)
+		except AddressOutOfBoundsException as e:
+			raise AddressOutOfBoundsException("Address out of bounds while trying to fetch next instruction: \n > " % (str(e)))
 
 		(op,arg) = Mac.dasm_op(instruction)
 	
 		# try to get the textual version of the oepration:
 		
 		op_name = Mac.get_name(op)
-
-		if op_name is None:
-			raise Exception("undefined operation: " + str(op))
-
 
 		if op_name == 'LODD':
 			self.ac = self.data[arg]
@@ -239,19 +250,22 @@ class Mic(object):
 				self.end = True
 				
 			self.pc = arg
-	
+			
 
 		elif op_name == 'JZER':
 			if self.ac == 0:
 				self.pc = arg
 
+
 		elif op_name == 'JNEG':
 			if self.ac < 0:
 				self.pc = arg
 
+
 		elif op_name == 'JPOS':
 			if self.ac >= 0:
 				self.pc = arg
+
 				
 		elif op_name == 'JNZE':
 			if self.ac != 0:
@@ -276,6 +290,7 @@ class Mic(object):
 				raise InfiniteRecursionException("Infinite recursion detected: depth(%d) >= MAX_DEPTH()." % (self.depth, Mic.MAX_CALL_DEPTH))
 
 			self.desp()
+			# it will be incremented before we run
 			self.data[self.sp] = self.pc
 			self.pc = arg
 
@@ -318,17 +333,10 @@ class Mic(object):
 		elif op_name == 'DESP':
 			self.desp(arg)
 
-class MacException(Exception):
-	pass
 
-class NamespaceException(MacException):
-	pass
-
-class UndefinedLabelException(MacException):
-	pass
-
-class MacAssemblerException(MacException):
-	pass
+		#wasnt' a jump instruction
+		if self.pc == pc:
+			self.pc += 1
 
 class MicProgramLine(object):
 
@@ -337,6 +345,9 @@ class MicProgramLine(object):
 		self.op = op
 		self.txt = txt
 		self.dbg_op = dbg_op
+
+	def __str__(self):
+		return "%4d: %s" % (self.n, self.txt)
 
 # Acts as a backing class for MicMemory, but
 # additionally parses every line of the source file, storing the 
@@ -361,7 +372,7 @@ class MicProgram(object):
 
 	def sym_lookup(self,name):
 		if name not in self.syms:
-			raise UndefinedLabelException("Reference to undefined label %s" % name)
+			raise UndefinedLabelException("undefined label '%s'" % name)
 
 		return self.syms[name]
 	
@@ -375,7 +386,7 @@ class MicProgram(object):
 
 			# if there was program data, 
 			# we return the allocated memory address
-			return len(self.mmap-1)
+			return len(self.mmap)-1
 
 		# othwise, return none
 		return None
@@ -383,11 +394,23 @@ class MicProgram(object):
 	def get_line(self,line):
 		return self.lines[line]
 
+	def get_line_by_addr(self,addr):
+		return self.lines[ 
+				self.mmap[addr] 
+				]
+
+
 	def __getitem__(self,addr):
+#		print(self.lines)
+#		print(self.mmap)
+
 		return self.lines[ self.mmap[addr] ].op
 		
 	def __setitem__(self,addr,value):
 		raise Exception("MicProgram memory is immutable. Use a fucking overlay [beacuse I mother-fucking said so.]")
+
+	def __len__(self):
+		return len(self.mmap)
 
 
 class Instruction(object):
@@ -425,6 +448,9 @@ class MacAsm(object):
 		# during phase 2, we look through the list to resolve the references.
 		self.sym_lookups = {}
 
+	def get_pgm(self):
+		return self.pgm
+
 	def assemble(self):
 
 		self.sym_lookups = {}
@@ -434,21 +460,27 @@ class MacAsm(object):
 
 			try:
 				self.assemble_line(line)
-			except Exception as e:
-				raise MacAssemblerException( "%s: parse error on line %d: \n > error: %s\n%s" % ( e.__class__.__name__, line_n, str(e), self.pgm.get_line(line_n) ) )
+			except MacException as e:
+				raise MacAssemblerException( "%s: parse error on line %d: \n > error: %s\n%s" % ( e.__class__.__name__, self.line+1, str(e), line.rstrip() ) )
 
 			self.line += 1
 
 		# pass 2: resolve references to symbols.
 		
-		for line_n, sym in self.sym_lookups:
+		for line_n in self.sym_lookups:
+			sym = self.sym_lookups[line_n]
 
 			try:
 				sym_val = self.pgm.sym_lookup(sym)
-			except Exception as e:
+			except MacException as e:
 				# long cat is long.
-				raise MacAssemblerException( "%s: Error looking up symbol '%s' on line %d:\n > error: %s\n%s" % ( e.__class__.__name__, sym, line_n, str(e), self.pgm.get_line(line_n) ) )
-				
+				raise MacAssemblerException( "%s: Error looking up symbol '%s' on line %d:\n > error: %s\n%s" % ( e.__class__.__name__, sym, line_n+1, str(e), self.pgm.get_line(line_n) ) )
+			
+			# now we have a symbol value, so get the line/op to update.
+			pgm_line = self.pgm.get_line(line_n)
+			(op,arg) = Mac.dasm_op(pgm_line.op)
+
+			pgm_line.op = Mac.asm_op(op,sym_val)
 
 		self.sym_lookups = {}
 
@@ -489,8 +521,6 @@ class MacAsm(object):
 			elif op is None:
 				op = Mac.get_code(tok)
 
-				if op is None:
-					raise Exception("Undefined operation, %s" % tok)
 
 			# it must be an arg!
 			elif arg is None:
@@ -508,18 +538,26 @@ class MacAsm(object):
 				arg = 0
 
 			# not none, not numeric... label!
-			elif not arg.isnumeric():
+			elif not arg.isnumeric():	
+				# queue symbol for lookup in phase 2.
+				self.sym_lookups[self.line] = arg
+
+				# set it to 0 for now
 				arg = 0
 
-				# queue symbol for lookup in phase 2.
-				self.sym_lookups[line] = arg
 
+			else:
+				arg = int(arg)
+
+			#print(line)
+			#print(op.__class__.__name__,arg.__class__.__name__)
+			#print("%s %s" % (str(op),str(arg)))
 			# now we can assemble the op, update the line.
-			pgm_line.op = Mac.op_asm(op,arg)
+			pgm_line.op = Mac.asm_op(op,arg)
 
 
 		# now add the line to the program.
-		addr = self.pgm.add_line(line)
+		addr = self.pgm.add_line(pgm_line)
 
 		# this line or a line above it(with no op) had a label.
 		# now we have an address for the label, so we add it to the symbol table.
@@ -528,7 +566,39 @@ class MacAsm(object):
 			self.next_label = None
 
 
-				
+
+if __name__ == '__main__':
+	print("the mother-fucking main")
+
+	data = sys.stdin
+	asm = MacAsm(data)
+
+	try: 
+		asm.assemble()
+
+	except MacAssemblerException as e:
+		print("Assembly failed: %s" % (str(e)), file=sys.stderr)
+		exit()
+
+	pgm = asm.get_pgm()
+
+	mic = Mic()
+
+	mic.load(pgm)
+
+	while not mic.end: 
+
+		try:
+			print(" > " + pgm.get_line_by_addr(mic.pc).txt)
+
+			mic.step()
+		except MicMacException as e:
+			print("%s: %s" % (e.__class__.__name__,str(e)) ,file=sys.stderr)
+
+
+	print(mic.data[22], mic.ac)
+
+exit()
 
 lines = []
 
@@ -606,11 +676,4 @@ for line in lines:
 		print("%03x %04x %-20s %4s %s" % (ins.n, ins_enc, label, ins.ins, ins.arg))
 			
 
-mic = Mic()
-
-mic.load(data)
-
-mic.run()
-
-print(mic.data[0x23], mic.ac)
 
