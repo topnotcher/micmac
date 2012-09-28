@@ -9,14 +9,12 @@ Main:
 	; f(1): if n - 2 < 0, then n==1, so result == 1 
 	JNEG	Stop
 
-
 fibonacci:	
-
-	; similarly: f(2) = 1. 
-	; Also handles when N decrements sufficiently 
 
 	LODD	N
 
+	; similarly: f(2) = 1. 
+	; Also handles when N decrements sufficiently 
 	JZER	Stop
 
 	; load f0 into AC
@@ -27,7 +25,6 @@ fibonacci:
 	STOD	Result
 
 	; now update the previous two elements...
-
 	; set f0=f1 (shift left)
 	LODD	f1
 	STOD	f0
@@ -41,9 +38,11 @@ fibonacci:
 	SUBD	one
 	STOD	N
 
+	; loop
 	JUMP	fibonacci
 
-Stop:	JUMP	Stop
+Stop:
+	JUMP	Stop
 
 two:	DEFN	2
 one:	DEFN	1
