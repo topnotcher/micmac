@@ -43,13 +43,25 @@ class Mac(object):
 		return Mac.OPERATIONS[name]
 
 	def asm_op(op,arg):
-		return (op&0xff)<<8 | (arg&0xff)
+
+		# stack operations. The op is 1 8 bits, arg 8.
+		if (op >> 4) == 0b1111:		
+			return (op&0xff)<<8 | (arg&0xff)
+
+		# other opartions. The op is 4 bits, arg 12.
+		else:
+			return (op&0xf)<<8 | (arg&0xfff)
+
 	
 	def dasm_op(instruction):
-		arg = instruction&0xff
-		op = (instruction>>8)&0xff
 
-		return (op,arg)
+		# stack op.
+		if ((instruction & 0xf000) >> 12) == 0b1111:
+			return ( (instruction&0xff00)>>8, instruction&0xff )
+
+		# other op
+		else:
+			return ( (instruction&0xf000)>>8, instruction&0xfff )
 
 class MicException(Exception):
 	pass
@@ -84,24 +96,24 @@ class MicMemory(object):
 		# data that is loaded in "by default"
 		self.data = data
 
-		self.original = {}
+		self.overlay = {}
 
 
 	def reset(self):
 		
-		for addr in self.original:
-			self.data[addr] = self.original[addr]
-
 		# overlay is things we have changed 
 		# this prevents modification of the memory itself
 		# so we can start over without reloading anything.
-		self.original = {}
+		self.overlay = {}
 
 	def __getitem__(self,addr):
 		if addr >= MicMemory.MEM_SIZE:
 			raise AddressOutOfBoundsException("memory adress out of bounds")
 
-		return self.data[addr]
+		if addr in self.overlay:
+			return self.overlay[addr]
+		else:
+			return self.data[addr]
 
 	def __setitem__(self,addr,data):
 
@@ -112,10 +124,7 @@ class MicMemory(object):
 			raise NumberOverflowException("M[%d] = %d: value %d is out of bounds." % (addr,data,data)) 
 
 		# create a backup.
-		self.original[addr] = self.data[addr]
-
-		
-		self.data[addr] = data
+		self.overlay[addr] = data
 
 		
 class Mic(object):
@@ -309,6 +318,78 @@ class Mic(object):
 		elif op_name == 'DESP':
 			self.desp(arg)
 
+class MacException(Exception):
+	pass
+
+class NamespaceException(MacException):
+	pass
+
+class UndefinedLabelException(MacException):
+	pass
+
+class MacAssemblerException(MacException):
+	pass
+
+class MicProgramLine(object):
+
+	def __init__(self, n, txt = '', op = None, dbg_op = None):
+		self.n = n
+		self.op = op
+		self.txt = txt
+		self.dbg_op = dbg_op
+
+# Acts as a backing class for MicMemory, but
+# additionally parses every line of the source file, storing the 
+# source alongside the binary instructions to facilitate debugging
+class MicProgram(object):
+
+	def __init__(self):
+
+		# symbol table; label: mem_addr
+		self.syms = {}
+
+		self.mmap = []
+
+		self.lines = []
+
+	def add_sym(self, name, addr):
+
+		if name in self.syms:
+			raise NamespaceException("Duplicate definition of label %s." % name)
+
+		self.syms[name] = addr
+
+	def sym_lookup(self,name):
+		if name not in self.syms:
+			raise UndefinedLabelException("Reference to undefined label %s" % name)
+
+		return self.syms[name]
+	
+	def add_line(self,line):
+		self.lines.append(line)
+		
+		# there's an asm op in the line
+		if line.op is not None:
+			# map the address to the line #.
+			self.mmap.append( len(self.lines) - 1 )
+
+			# if there was program data, 
+			# we return the allocated memory address
+			return len(self.mmap-1)
+
+		# othwise, return none
+		return None
+
+	def get_line(self,line):
+		return self.lines[line]
+
+	def __getitem__(self,addr):
+		return self.lines[ self.mmap[addr] ].op
+		
+	def __setitem__(self,addr,value):
+		raise Exception("MicProgram memory is immutable. Use a fucking overlay [beacuse I mother-fucking said so.]")
+
+
 class Instruction(object):
 	def __init__(self,n,label,ins,arg):
 		self.n = n
@@ -327,7 +408,127 @@ class Line(object):
 		self.data = data
 
 
-	
+class MacAsm(object):
+
+	def __init__(self,data):
+		self.data = data
+
+		self.line = 0
+
+		self.next_label = None
+
+		self.pgm = MicProgram()
+
+		# line : symbol
+		# each time we find a reference toa symbol during phase 1 (tokenizing),
+		# we add the line/symbol to this list.
+		# during phase 2, we look through the list to resolve the references.
+		self.sym_lookups = {}
+
+	def assemble(self):
+
+		self.sym_lookups = {}
+
+		# pass 1: we go through and tokenize every line.
+		for line in self.data:
+
+			try:
+				self.assemble_line(line)
+			except Exception as e:
+				raise MacAssemblerException( "%s: parse error on line %d: \n > error: %s\n%s" % ( e.__class__.__name__, line_n, str(e), self.pgm.get_line(line_n) ) )
+
+			self.line += 1
+
+		# pass 2: resolve references to symbols.
+		
+		for line_n, sym in self.sym_lookups:
+
+			try:
+				sym_val = self.pgm.sym_lookup(sym)
+			except Exception as e:
+				# long cat is long.
+				raise MacAssemblerException( "%s: Error looking up symbol '%s' on line %d:\n > error: %s\n%s" % ( e.__class__.__name__, sym, line_n, str(e), self.pgm.get_line(line_n) ) )
+				
+
+		self.sym_lookups = {}
+
+	def assemble_line(self,line):
+
+		line = line.rstrip()
+
+		pgm_line = MicProgramLine(self.line+1, line)
+
+		line = line.lstrip()
+
+
+		# each line has the form:
+		#label: OP ARG whitsp/comment.
+
+		toks = line.split(None,3)
+			
+		i = 0
+
+		op = None
+		arg = None
+
+		for tok in toks:
+
+			# the rest of the line is a comment.
+			if tok.startswith(';'):
+				# TODO: handle dbg_op
+				break
+
+			elif tok.endswith(':'):
+
+				if i != 0:
+					raise Exception("Unexpected label at pos %d" % i)
+		
+				self.next_label = tok[0:-1]
+
+			# it's not a label, it's not a whitespace/comment and there's no op yet.
+			elif op is None:
+				op = Mac.get_code(tok)
+
+				if op is None:
+					raise Exception("Undefined operation, %s" % tok)
+
+			# it must be an arg!
+			elif arg is None:
+				arg = tok
+
+			else:
+				break
+
+
+			i += 1
+
+		if op is not None:
+
+			if arg is None:
+				arg = 0
+
+			# not none, not numeric... label!
+			elif not arg.isnumeric():
+				arg = 0
+
+				# queue symbol for lookup in phase 2.
+				self.sym_lookups[line] = arg
+
+			# now we can assemble the op, update the line.
+			pgm_line.op = Mac.op_asm(op,arg)
+
+
+		# now add the line to the program.
+		addr = self.pgm.add_line(line)
+
+		# this line or a line above it(with no op) had a label.
+		# now we have an address for the label, so we add it to the symbol table.
+		if addr is not None and self.next_label is not None:
+			self.pgm.add_sym(self.next_label, addr)
+			self.next_label = None
+
+
+				
 
 lines = []
 
