@@ -1,21 +1,21 @@
 ; Load N = 10 into the accumulator
-main:	LOCO	10
+main:
+	LOCO	10
 
 	; push arg N onto stack
-	PUSH	0
+	PUSH
 
 	; allocate space for return value. 
-	PUSH	0
+	PUSH
 
 	; call F(N)
 	CALL	fibonacci
 
 	; get the return value...
-	POP	0
+	POP
 
 	; save the return value to result.
 	STOD	result
-
 
 	JUMP	stop
 
@@ -26,7 +26,8 @@ main:	LOCO	10
 ; MY N
 ; ...
 ; so we call LODL 2 to get N
-fibonacci:	LODL	2
+fibonacci:
+	LODL	2
 
 	; AC = N - 3
 	SUBD	three
@@ -43,10 +44,10 @@ fibonacci:	LODL	2
 	SUBD	one
 
 	; push arg N onto stack
-	PUSH	0
+	PUSH
 
 	; allocate space for return value.
-	PUSH	0
+	PUSH
 
 	CALL	fibonacci
 
@@ -59,14 +60,17 @@ fibonacci:	LODL	2
 	; ...
 
 	; get the return value
-	POP	0
+	POP
+
 	; SP = called fn's N
 	
 	; store return value into MY return value .
 	STOL	2
 
 	; finish freeing the called FN's AR
-	DESP	1
+	; good
+	INSP	1
+
 	; SP = my return address
 
 	; now we need to call fibonacci again and add the result.
@@ -77,8 +81,8 @@ fibonacci:	LODL	2
 	; N-2
 	SUBD	two
 
-	PUSH	0
-	PUSH	0
+	PUSH
+	PUSH
 
 	CALL	fibonacci
 
@@ -91,7 +95,7 @@ fibonacci:	LODL	2
 	; ...
 
 	; pop the return value.
-	POP	0
+	POP
 	; SP = Called fn's N
 
 	; Add it to MY return value
@@ -101,15 +105,16 @@ fibonacci:	LODL	2
 	STOL	2
 
 	; finish cleaning the AR
-	DESP	1
+	INSP	1
 	; SP = My return address
 
 	; gtfo
-	RETN	0
+	RETN
 
 
 ; load 1
-return1:	LOCO	1
+return1:
+	LOCO	1
 
 	; SP = return address 
 	; return value 
@@ -119,13 +124,13 @@ return1:	LOCO	1
 	STOL	1
 
 	; gtfo
-	RETN	0
+	RETN
 
 
 
 stop:	JUMP	stop
 
-three:	LODD	3
-one:	LODD	1
-two:	LODD	2
-result:	LODD	0
+three:	DEFN	3
+one:	DEFN	1
+two:	DEFN	2
+result:	DEFN	0
