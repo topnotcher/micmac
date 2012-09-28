@@ -20,6 +20,24 @@ class MacAssemblerException(MacException):
 class UndefinedOperationException(MacException):
 	pass
 
+class MicException(MicMacException):
+	pass
+
+class NumberOverflowException(MicException):
+	pass
+class AddressOutOfBoundsException(MicException):
+	pass
+
+class StackOverflowException(MicException):
+	pass
+
+class StackUnderflowException(MicException):
+	pass
+
+class InfiniteRecursionException(MicException):
+	pass
+
+
 class Mac(object):
 	OPERATIONS = {
 			'LODD' : 0b00000000 , 
@@ -84,23 +102,6 @@ class Mac(object):
 		# other op
 		else:
 			return ( (instruction&0xf000)>>8, instruction&0xfff )
-
-class MicException(MicMacException):
-	pass
-
-class NumberOverflowException(MicException):
-	pass
-class AddressOutOfBoundsException(MicException):
-	pass
-
-class StackOverflowException(MicException):
-	pass
-
-class StackUnderflowException(MicException):
-	pass
-
-class InfiniteRecursionException(MicException):
-	pass
 
 
 # basic object to represent the memory in the MIC
@@ -502,9 +503,12 @@ class MacAsm(object):
 
 		for tok in toks:
 
+			# this is an instruction for the debugger...
+			if tok.startswith(';dbg_'):
+				break;
+
 			# the rest of the line is a comment.
-			if tok.startswith(';'):
-				# TODO: handle dbg_op
+			elif tok.startswith(';'):
 				break
 
 			elif tok.endswith(':'):
@@ -608,8 +612,5 @@ if __name__ == '__main__':
 			mic.step()
 		except MicMacException as e:
 			print("%s: %s" % (e.__class__.__name__,str(e)) ,file=sys.stderr)
-
-
-		
 
 	print(mic.data[22], mic.ac)
