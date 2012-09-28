@@ -3,30 +3,216 @@
 import sys
 
 ins_set = {
-		'LODD' : 0b0000 << 12, 
-		'STOD' : 0b0001 << 12,
-		'LOCO' : 0b0111 << 12,
-		'ADDD' : 0b0010 << 12,
-		'SUBD' : 0b0011 << 12,
-		'JUMP' : 0b0110 << 12,
-		'JZER' : 0b0101 << 12,
-		'JNEG' : 0b1100 << 12,
-		'LODL' : 0b1000 << 12,
-		'STOL' : 0b1001 << 12,
-		'ADDL' : 0b1010 << 12,
-		'SUBL' : 0b1011 << 12,
-		'JPOS' : 0b0100 << 12,
-		'JNZE' : 0b1101 << 12,
-		'CALL' : 0b1110 << 12,
+		'LODD' : 0b00000000 , 
+		'STOD' : 0b00010000 ,
+		'LOCO' : 0b01110000 ,
+		'ADDD' : 0b00100000 ,
+		'SUBD' : 0b00110000 ,
+		'JUMP' : 0b01100000 ,
+		'JZER' : 0b01010000 ,
+		'JNEG' : 0b11000000 ,
+		'LODL' : 0b10000000 ,
+		'STOL' : 0b10010000 ,
+		'ADDL' : 0b10100000 ,
+		'SUBL' : 0b10110000 ,
+		'JPOS' : 0b01000000 ,
+		'JNZE' : 0b11010000 ,
+		'CALL' : 0b11100000 ,
 
-		'RETN' : 0b11111000 << 8,
-		'PUSH' : 0b11110100 << 8,
-		'POP'  : 0b11110110 << 8,
-		'PSHI' : 0b11110000 << 8,
-		'POPI' : 0b11110010 << 8,
-		'SWAP' : 0b11111010 << 8,
-		'INSP' : 0b11111010 << 8,
-		'DESP' : 0b11111110 << 8
+		'RETN' : 0b11111000,
+		'PUSH' : 0b11110100,
+		'POP'  : 0b11110110,
+		'PSHI' : 0b11110000,
+		'POPI' : 0b11110010,
+		'SWAP' : 0b11111010,
+		'INSP' : 0b11111010,
+		'DESP' : 0b11111110
+}
+
+
+
+class Mic(object):
+
+	
+
+	def __init__(self):
+		self.reset()
+
+	def reset(self):
+			self.pc = 0
+			self.sp = 0
+			self.ac = None
+			self.data = None
+			self.stack = []
+
+	def load(self,data):
+
+		# @todo out of memory
+		self.data = data
+
+	
+	def get_mem_data(self,addr):
+		if addr >= len(self.data):
+			raise Exception("memory location out-of-bounds")
+
+		return self.data[addr]
+
+	def set_mem_data(self,addr,data):
+		if  addr > 4095:
+			raise Exception("Memory adress out of bounds")
+
+		self.data[addr] = data
+
+	def run(self):
+		pc = self.pc
+
+		# in the default case, increment  pc by 1.
+		self.pc += 1
+
+		
+		instruction = self.get_mem_data(pc)
+
+		arg = instruction&0xff
+		op = (instruction>>8)&0xff
+
+		# no operation in this cell...
+		if op == 0:
+			raise Exception("No-Op")
+
+		
+		# try to get the textual version of the oepration:
+		
+		op_name = None
+
+		for ins_name in ins_set:
+			if ins_set[ins_name] == op:
+				op_name = ins_name
+				break
+
+		if op_name is None:
+			raise Exception("undefined operation: " + str(op))
+
+
+		
+		if op_name == 'LODD':
+			self.ac = self.get_mem_data(arg)
+
+		elif op_name == 'STOD':
+			if self.ac is  None:
+				raise Exception("Trying to STOD with a null AC???")
+
+			
+			self.set_mem_data(arg,self.ac)
+
+		elif op_name == 'LOCO':
+			self.ac = arg
+
+		elif op_name == 'ADDD':
+			self.ac += self.get_mem_data(arg)
+
+		elif op_name == 'SUBD':
+			self.ac -= self.get_mem_data(arg)
+
+			
+		elif op_name == 'JUMP':
+			self.pc = arg
+
+		elif op_name == 'JZER':
+			if self.ac == 0:
+				self.pc = arg
+
+		elif op_name == 'JNEG':
+			if self.ac < 0:
+				self.pc = arg
+
+		elif op_name == 'JPOS':
+			if self.ac >= 0:
+				self.pc = arg
+				
+		elif op_name == 'JNZE':
+			if self.ac != 0:
+				self.pc = arg
+
+		elif op_name == 'LODL':
+			#todo handle bounds better
+			self.ac = self.stack[arg-1]
+
+		elif op_name == 'STOL':
+			self.stack[arg-1] = self.ac
+	
+		elif op_name == 'ADDL':
+			self.ac += self.stack[arg-1]
+
+		elif op_name == 'SUBL':
+			self.ac -= self.stack[arg-1]
+
+
+		elif op_name == 'CALL':
+			self.stack.append(self.pc)
+			self.sp += 1
+			self.pc = arg
+
+		elif op_name == 'RETN':
+			self.sp -= 1
+			self.pc = self.stack.pop()
+
+		elif op_name == 'PUSH':
+			self.stack.append(self.ac)
+			self.sp += 1
+
+		elif op_name == 'POP':
+			self.ac = self.stack.pop()
+			self.sp -= 1
+
+		elif op_name == 'PSHI':
+				pass
+
+		elif op_name == 'POPI':
+			pass
+
+		elif op_name == 'SWAP':
+			tmp = self.sp 
+			self.sp = self.ac
+			self.ac = tmp
+
+
+
+		elif op_name == 'INSP':
+			#TODO bounds check
+
+			self.sp += arg
+
+		elif op_name == 'DESP':
+			self.sp -= arg
+
+
+
+
+ins_set = {
+		'LODD' : 0b00000000 , 
+		'STOD' : 0b00010000 ,
+		'LOCO' : 0b01110000 ,
+		'ADDD' : 0b00100000 ,
+		'SUBD' : 0b00110000 ,
+		'JUMP' : 0b01100000 ,
+		'JZER' : 0b01010000 ,
+		'JNEG' : 0b11000000 ,
+		'LODL' : 0b10000000 ,
+		'STOL' : 0b10010000 ,
+		'ADDL' : 0b10100000 ,
+		'SUBL' : 0b10110000 ,
+		'JPOS' : 0b01000000 ,
+		'JNZE' : 0b11010000 ,
+		'CALL' : 0b11100000 ,
+
+		'RETN' : 0b11111000,
+		'PUSH' : 0b11110100,
+		'POP'  : 0b11110110,
+		'PSHI' : 0b11110000,
+		'POPI' : 0b11110010,
+		'SWAP' : 0b11111010,
+		'INSP' : 0b11111010,
+		'DESP' : 0b11111110
 }
 
 """ins_no_val = [
@@ -107,7 +293,7 @@ for line in sys.stdin:
 
 print "-----------------------------------------"
 #print labels
-
+data = []
 for line in lines:
 
 	if line.type in (Line.TYPE_CMT, Line.TYPE_WHT):
@@ -124,7 +310,18 @@ for line in lines:
 		else:
 			argN = int(ins.arg)
 
-		ins_enc = (ins_set[ins.ins]&0xFF00) | (argN&0xFF);
+		ins_enc = ((ins_set[ins.ins]&0xFF) << 8) | (argN&0xFF);
+
+		data.append(ins_enc)
 
 		print("%03x %04x %-20s %4s %s" % (ins.n, ins_enc, label, ins.ins, ins.arg))
 			
+
+mic = Mic()
+
+mic.load(data)
+
+mic.run()
+
+print mic.data[0x23], mic.ac
+
