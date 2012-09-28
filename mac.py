@@ -2,40 +2,78 @@
 
 import sys
 
-OPERATIONS = {
-		'LODD' : 0b00000000 , 
-		'STOD' : 0b00010000 ,
-		'LOCO' : 0b01110000 ,
-		'ADDD' : 0b00100000 ,
-		'SUBD' : 0b00110000 ,
-		'JUMP' : 0b01100000 ,
-		'JZER' : 0b01010000 ,
-		'JNEG' : 0b11000000 ,
-		'LODL' : 0b10000000 ,
-		'STOL' : 0b10010000 ,
-		'ADDL' : 0b10100000 ,
-		'SUBL' : 0b10110000 ,
-		'JPOS' : 0b01000000 ,
-		'JNZE' : 0b11010000 ,
-		'CALL' : 0b11100000 ,
-		'RETN' : 0b11111000,
-		'PUSH' : 0b11110100,
-		'POP'  : 0b11110110,
-		'PSHI' : 0b11110000,
-		'POPI' : 0b11110010,
-		'SWAP' : 0b11111010,
-		'INSP' : 0b11111010,
-		'DESP' : 0b11111110
-}
+class Mac(object):
+	OPERATIONS = {
+			'LODD' : 0b00000000 , 
+			'STOD' : 0b00010000 ,
+			'LOCO' : 0b01110000 ,
+			'ADDD' : 0b00100000 ,
+			'SUBD' : 0b00110000 ,
+			'JUMP' : 0b01100000 ,
+			'JZER' : 0b01010000 ,
+			'JNEG' : 0b11000000 ,
+			'LODL' : 0b10000000 ,
+			'STOL' : 0b10010000 ,
+			'ADDL' : 0b10100000 ,
+			'SUBL' : 0b10110000 ,
+			'JPOS' : 0b01000000 ,
+			'JNZE' : 0b11010000 ,
+			'CALL' : 0b11100000 ,
+			'RETN' : 0b11111000,
+			'PUSH' : 0b11110100,
+			'POP'  : 0b11110110,
+			'PSHI' : 0b11110000,
+			'POPI' : 0b11110010,
+			'SWAP' : 0b11111010,
+			'INSP' : 0b11111010,
+			'DESP' : 0b11111110
+	}
+
+	def get_name(op) :
+		for name in Mac.OPERATIONS:
+			if op == Mac.OPERATIONS[name]:
+				return name
+
+		return None
+
+	def get_code(name):
+		if name not in Mac.OPERATIONS:
+			return None
+
+		return Mac.OPERATIONS[name]
+
+	def asm_op(op,arg):
+		return (op&0xff)<<8 | (arg&0xff)
+	
+	def dasm_op(instruction):
+		arg = instruction&0xff
+		op = (instruction>>8)&0xff
+
+		return (op,arg)
 
 class MicException(Exception):
+	pass
+
+class NumberOverflowException(MicException):
 	pass
 
 class AddressOutOfBoundsException(MicException):
 	pass
 
+class StackOverflowException(MicException):
+	pass
+
+class StackUnderflowException(MicException):
+	pass
+
+class InfiniteRecursionException(MicException):
+	pass
+
 
 # basic object to represent the memory in the MIC
+# This just handles the "frontend" of the memory.
+#  when MicMemory is instantiated, it must be passed some
+# subscriptable object to back it.
 class MicMemory(object):
 	MEM_SIZE = 4096
 
@@ -70,6 +108,9 @@ class MicMemory(object):
 		if addr >= MicMemory.MEM_SIZE:
 			raise AddressOutofBoundsException("memory address out of bounds")
 
+		if data > 0xffff:
+			raise NumberOverflowException("M[%d] = %d: value %d is out of bounds." % (addr,data,data)) 
+
 		# create a backup.
 		self.original[addr] = self.data[addr]
 
@@ -78,6 +119,12 @@ class MicMemory(object):
 
 		
 class Mic(object):
+
+	# prevent the stack from growing beyond this address...
+	MAX_SATCK_SIZE = 2048
+
+	# prevent nesting beyond this level...
+	MAX_CALL_DEPTH = 100
 
 	def __init__(self):
 		self.data = None
@@ -97,6 +144,9 @@ class Mic(object):
 			else:
 				self.data = None
 
+			# how many CALL()s deep are we?
+			self.depth = 0
+
 			#has the proram terminated?
 			self.end = False
 
@@ -105,7 +155,22 @@ class Mic(object):
 		# @todo out of memory
 		self.data = MicMemory(data)
 
-	
+
+	# increment stack pointer
+	def insp(self,amt = 1):
+
+		if (self.sp+amt) >= MicMemory.MEM_SIZE:
+			raise StackUnderflowException("SP(%d) += %d underflows the stack" % (self.sp, amt))
+
+		self.sp += amt
+
+	def desp(self,amt = 1):
+
+		if (self.sp-amt) < MicMemory.MEM_SIZE - Mic.MAX_STACK_SIZE:
+			raise StackOverflowException("SP(%d) -= %d overflows the stack. MAX_STACK_SIZE = %d" % (self.sp, amt, Mic.MAX_STACK_SIZE))
+
+		self.sp -= amt
+
 	def run(self, limit = None)	:
 
 		if self.end:
@@ -130,17 +195,11 @@ class Mic(object):
 		except AddressOutOfBoundsException :
 			raise AddresOutOfBoundsException("Memory address PC = %04x out of bounds while trying to fetch next instruction." % pc)
 
-		arg = instruction&0xff
-		op = (instruction>>8)&0xff
+		(op,arg) = Mac.dasm_op(instruction)
 	
 		# try to get the textual version of the oepration:
 		
-		op_name = None
-
-		for ins_name in OPERATIONS:
-			if OPERATIONS[ins_name] == op:
-				op_name = ins_name
-				break
+		op_name = Mac.get_name(op)
 
 		if op_name is None:
 			raise Exception("undefined operation: " + str(op))
@@ -205,29 +264,41 @@ class Mic(object):
 			self.ac -= self.data[self.sp + arg]
 
 		elif op_name == 'CALL':
-			self.sp -= 1
+
+			if self.depth >= Mic.MAX_CALL_DEPTH:
+				raise InfiniteRecursionException("Infinite recursion detected: depth(%d) >= MAX_DEPTH()." % (self.depth, Mic.MAX_CALL_DEPTH))
+
+			self.desp()
 			self.data[self.sp] = self.pc
 			self.pc = arg
 
+
+
 		elif op_name == 'RETN':
+			self.depth -= 1
+
+			if self.depth < 0:
+				raise StackUnderflowException("Tried to return from too many calls...")
+
 			self.pc = self.data[self.sp]
-			self.sp += 1
+
+			self.insp()
 
 		elif op_name == 'PUSH':
-			self.sp -= 1
+			self.desp()
 			self.data[self.sp] = self.ac
 
 		elif op_name == 'POP':
 			self.ac = self.data[self.sp]
-			self.sp += 1
+			self.insp()
 
 		elif op_name == 'PSHI':
-			self.sp -= 1
+			self.desp()
 			self.data[self.sp] = self.data[arg]
 
 		elif op_name == 'POPI':
 			self.data[arg] = self.data[self.sp]
-			self.sp += 1
+			self.insp()
 
 		elif op_name == 'SWAP':
 			tmp = self.sp 
@@ -235,13 +306,10 @@ class Mic(object):
 			self.ac = tmp
 
 		elif op_name == 'INSP':
-			#TODO bounds check
-
-			self.sp += arg
+			self.insp(arg)
 
 		elif op_name == 'DESP':
-			self.sp -= arg
-
+			self.desp(arg)
 
 class Instruction(object):
 	def __init__(self,n,label,ins,arg):
@@ -299,7 +367,7 @@ for line in sys.stdin:
 	else:
 		label = None
 
-	if ins not in OPERATIONS:
+	if ins not in Mac.OPERATIONS:
 		raise Exception("Unknown instruction: '" + ins + "'")
 
 	
@@ -332,7 +400,7 @@ for line in lines:
 		else:
 			argN = int(ins.arg)
 
-		ins_enc = ((OPERATIONS[ins.ins]&0xFF) << 8) | (argN&0xFF);
+		ins_enc = ((Mac.OPERATIONS[ins.ins]&0xFF) << 8) | (argN&0xFF);
 
 		data.append(ins_enc)
 
