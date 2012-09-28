@@ -132,7 +132,7 @@ class Mic(object):
 
 	def reset(self):
 			# program entry point is always addr 0
-			self.pc = 0
+			self.pc = -1
 
 			#start the stack pointer below the bottom of memory.
 			self.sp = MicMemory.MEM_SIZE
@@ -160,14 +160,14 @@ class Mic(object):
 	def insp(self,amt = 1):
 
 		if (self.sp+amt) >= MicMemory.MEM_SIZE:
-			raise StackUnderflowException("SP(%d) += %d underflows the stack" % (self.sp, amt))
+			raise StackUnderflowException("SP(%04x) += %d underflows the stack" % (self.sp, amt))
 
 		self.sp += amt
 
 	def desp(self,amt = 1):
 
 		if (self.sp-amt) < MicMemory.MEM_SIZE - Mic.MAX_STACK_SIZE:
-			raise StackOverflowException("SP(%d) -= %d overflows the stack. MAX_STACK_SIZE = %d" % (self.sp, amt, Mic.MAX_STACK_SIZE))
+			raise StackOverflowException("SP(%04x) -= %d overflows the stack. MAX_STACK_SIZE = %d" % (self.sp, amt, Mic.MAX_STACK_SIZE))
 
 		self.sp -= amt
 
@@ -185,10 +185,9 @@ class Mic(object):
 		if self.end:
 			raise Exception("Program completed")
 
-		pc = self.pc
-
 		# in the default case, increment  pc by 1.
 		self.pc += 1
+		pc =  self.pc
 
 		try:
 			instruction = self.data[pc]
@@ -226,7 +225,6 @@ class Mic(object):
 
 			
 		elif op_name == 'JUMP':
-				
 			#trying to jump to current instruction = stop
 			if self.pc == arg:
 				self.end = True

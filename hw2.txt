@@ -11,7 +11,8 @@ Main:	LODD	N
 
 ; similarly: f(2) = 1. 
 ; Also handlers when N decrements sufficiently 
-fibonacci:	JZER	Stop
+fibonacci:	LODD	N
+	JZER	Stop
 
 	; load f0 into AC
 	LODD	f0
