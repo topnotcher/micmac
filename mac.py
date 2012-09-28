@@ -428,24 +428,6 @@ class MicProgram(object):
 		return len(self.mmap)
 
 
-class Instruction(object):
-	def __init__(self,n,label,ins,arg):
-		self.n = n
-		self.label = label
-		self.ins = ins
-		self.arg = arg
-
-	
-class Line(object):
-	TYPE_INS = 0
-	TYPE_WHT = 1
-	TYPE_CMT = 2
-
-	def __init__(self,type,data):
-		self.type = type
-		self.data = data
-
-
 class MacAsm(object):
 
 	def __init__(self,data):
@@ -617,93 +599,17 @@ if __name__ == '__main__':
 
 	while not mic.end: 
 
-		try:
-			#print(" > " + pgm.get_line_by_addr(mic.pc).txt)
-			print_baudet(pgm,pgm.get_line_by_addr(mic.pc))
+		# this is the next line with an instruction in it.
+		next_line = pgm.get_line_by_addr(mic.pc)
 
+		print_baudet(pgm,next_line)
+
+		try :
 			mic.step()
 		except MicMacException as e:
 			print("%s: %s" % (e.__class__.__name__,str(e)) ,file=sys.stderr)
 
 
+		
+
 	print(mic.data[22], mic.ac)
-
-exit()
-
-lines = []
-
-labels = {}
-
-N = 0;
-i = 0
-label = None
-
-for line in sys.stdin:
-	N += 1
-#	line = line.strip()
-
-	print("%3d     %s" % (N,line)),
-
-	#comments and blanks...
-	if line.strip().startswith(';') or len(line.strip()) == 0:
-		lines.append(Line(Line.TYPE_CMT, line.strip()))
-		continue
-
-	try:
-		# else it is an instruction
-		(label,ins,arg) = line.split("\t")
-	except (ValueError):
-		print("Epic fail parsing line: ")
-		print(line)
-		exit();
-		
-
-	arg = arg.strip();
-
-	if len(label) > 1 and label[-1] == ':':
-		label = label[0:-1]
-		labels[label] = i
-	else:
-		label = None
-
-	if ins not in Mac.OPERATIONS:
-		raise Exception("Unknown instruction: '" + ins + "'")
-
-	
-	lines.append( Line(Line.TYPE_INS, Instruction(i,label,ins,arg) ))
-
-	#addr, instruction, label, instruction, arg
-#	print("%03x %1x%03x %-20s %4s %s" % (i, OPERATIONS[ins], 0, label, ins, arg));
-
-
-	i += 1
-#	label = ''
-
-
-print("-----------------------------------------")
-#print labels
-data = []
-for line in lines:
-
-	if line.type in (Line.TYPE_CMT, Line.TYPE_WHT):
-		print(line.data)
-
-	elif line.type == Line.TYPE_INS:
-		ins = line.data
-		label = ''
-		if ins.label is not None:
-			label = ins.label + ':'
-		
-		if not ins.arg.isdigit():
-			argN = labels[ins.arg]
-		else:
-			argN = int(ins.arg)
-
-		ins_enc = ((Mac.OPERATIONS[ins.ins]&0xFF) << 8) | (argN&0xFF);
-
-		data.append(ins_enc)
-
-		print("%03x %04x %-20s %4s %s" % (ins.n, ins_enc, label, ins.ins, ins.arg))
-			
-
-
