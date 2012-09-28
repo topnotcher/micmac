@@ -1,112 +1,54 @@
-; Greg Bowser
-; CSC411, HW2
+Main:	LODD	N
 
-  1     Main:	LODD	N
-  2     
-  3     	; assume that input n>=1. (n==0 should return 0. < 0 is undefined)
-  4     	; N -= 2
-  5     	SUBD	two
-  6     
-  7     
-  8     	; f(1): if n - 2 < 0, then n==1, so result == 1 
-  9     	JNEG	Stop
- 10     
- 11     
- 12     ; similarly: f(2) = 1. 
- 13     ; Also handlers when N decrements sufficiently 
- 14     fibonacci:	JZER	Stop
- 15     
- 16     	; load f0 into AC
- 17     	LODD	f0
- 18     
- 19     	; result = f0 + f1 = AC + f1
- 20     	ADDD	f1
- 21     	STOD	Result
- 22     
- 23     	; now update the previous two elements...
- 24     
- 25     	; set f0=f1 (shift left)
- 26     	LODD	f1
- 27     	STOD	f0
- 28     
- 29     	; set f1=result
- 30     	LODD	Result 
- 31     	STOD	f1
- 32     	
- 33     	; n -= 1
- 34     	LODD	N
- 35     	SUBD	one
- 36     	STOD	N
- 37     
- 38     	JUMP	fibonacci
- 39     
- 40     Stop:	JUMP	Stop
- 41     
- 42     two:	LODD	2
- 43     one:	LODD	1
- 44     
- 45     ; Previous two elements in the sequence
- 46     f0:	LODD	1
- 47     f1:	LODD	1
- 48     
- 49     ; Input
- 50     N:	LODD	10
- 51     
- 52     ; result of f(n)
- 53     Result:	LODD	1
- 54     
------------------------------------------
-000 0014 Main:                LODD N
-
-; assume that input n>=1. (n==0 should return 0. < 0 is undefined)
-; N -= 2
-001 3010                      SUBD two
+	; assume that input n>=1. (n==0 should return 0. < 0 is undefined)
+	; N -= 2
+	SUBD	two
 
 
-; f(1): if n - 2 < 0, then n==1, so result == 1
-002 c00f                      JNEG Stop
+	; f(1): if n - 2 < 0, then n==1, so result == 1 
+	JNEG	Stop
 
 
-; similarly: f(2) = 1.
-; Also handlers when N decrements sufficiently
-003 500f fibonacci:           JZER Stop
+; similarly: f(2) = 1. 
+; Also handlers when N decrements sufficiently 
+fibonacci:	JZER	Stop
 
-; load f0 into AC
-004 0012                      LODD f0
+	; load f0 into AC
+	LODD	f0
 
-; result = f0 + f1 = AC + f1
-005 2013                      ADDD f1
-006 1015                      STOD Result
+	; result = f0 + f1 = AC + f1
+	ADDD	f1
+	STOD	Result
 
-; now update the previous two elements...
+	; now update the previous two elements...
 
-; set f0=f1 (shift left)
-007 0013                      LODD f1
-008 1012                      STOD f0
+	; set f0=f1 (shift left)
+	LODD	f1
+	STOD	f0
 
-; set f1=result
-009 0015                      LODD Result
-00a 1013                      STOD f1
+	; set f1=result
+	LODD	Result 
+	STOD	f1
+	
+	; n -= 1
+	LODD	N
+	SUBD	one
+	STOD	N
 
-; n -= 1
-00b 0014                      LODD N
-00c 3011                      SUBD one
-00d 1014                      STOD N
+	JUMP	fibonacci
 
-00e 6003                      JUMP fibonacci
+Stop:	JUMP	Stop
 
-00f 600f Stop:                JUMP Stop
-
-010 0002 two:                 LODD 2
-011 0001 one:                 LODD 1
+two:	LODD	2
+one:	LODD	1
 
 ; Previous two elements in the sequence
-012 0001 f0:                  LODD 1
-013 0001 f1:                  LODD 1
+f0:	LODD	1
+f1:	LODD	1
 
 ; Input
-014 000a N:                   LODD 10
+N:	LODD	10
 
 ; result of f(n)
-015 0001 Result:              LODD 1
+Result:	LODD	1
 
