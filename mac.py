@@ -18,7 +18,6 @@ OPERATIONS = {
 		'JPOS' : 0b01000000 ,
 		'JNZE' : 0b11010000 ,
 		'CALL' : 0b11100000 ,
-
 		'RETN' : 0b11111000,
 		'PUSH' : 0b11110100,
 		'POP'  : 0b11110110,
@@ -29,9 +28,11 @@ OPERATIONS = {
 		'DESP' : 0b11111110
 }
 
-class AddressOutOfBoundsException(Exception):
+class MicException(Exception):
 	pass
 
+class AddressOutOfBoundsException(MicException):
+	pass
 
 
 # basic object to represent the memory in the MIC
@@ -75,28 +76,37 @@ class MicMemory(object):
 		
 		self.data[addr] = data
 
-	
 		
 class Mic(object):
 
 	def __init__(self):
+		self.data = None
 		self.reset()
 
 	def reset(self):
+			# program entry point is always addr 0
 			self.pc = 0
-			self.sp = None
+
+			#start the stack pointer below the bottom of memory.
+			self.sp = MicMemory.MEM_SIZE
+
 			self.ac = None
-			self.data = None
-			self.stack = []
+
+			if self.data is not None:
+				self.data.reset()
+			else:
+				self.data = None
+
+			#has the proram terminated?
 			self.end = False
 
 	def load(self,data):
 
 		# @todo out of memory
-		self.data = data
-	
+		self.data = MicMemory(data)
 
-	def run(self, limit = None):
+	
+	def run(self, limit = None)	:
 
 		if self.end:
 			raise Exception("Program completed")
@@ -136,7 +146,6 @@ class Mic(object):
 			raise Exception("undefined operation: " + str(op))
 
 
-		
 		if op_name == 'LODD':
 			self.ac = self.data[arg]
 
@@ -145,7 +154,7 @@ class Mic(object):
 				raise Exception("Trying to STOD with a null AC???")
 
 			
-			self.data[arg,self.ac]
+			self.data[arg] = self.ac
 
 		elif op_name == 'LOCO':
 			self.ac = arg
@@ -184,47 +193,46 @@ class Mic(object):
 
 		elif op_name == 'LODL':
 			#todo handle bounds better
-			self.ac = self.stack[arg-1]
+			self.ac = self.data[self.sp + arg]
 
 		elif op_name == 'STOL':
-			self.stack[arg-1] = self.ac
+			self.data[self.sp + arg] = self.ac
 	
 		elif op_name == 'ADDL':
-			self.ac += self.stack[arg-1]
+			self.ac += self.data[self.sp + arg]
 
 		elif op_name == 'SUBL':
-			self.ac -= self.stack[arg-1]
-
+			self.ac -= self.data[self.sp + arg]
 
 		elif op_name == 'CALL':
-			self.stack.append(self.pc)
-			self.sp += 1
+			self.sp -= 1
+			self.data[self.sp] = self.pc
 			self.pc = arg
 
 		elif op_name == 'RETN':
-			self.sp -= 1
-			self.pc = self.stack.pop()
-
-		elif op_name == 'PUSH':
-			self.stack.append(self.ac)
+			self.pc = self.data[self.sp]
 			self.sp += 1
 
-		elif op_name == 'POP':
-			self.ac = self.stack.pop()
+		elif op_name == 'PUSH':
 			self.sp -= 1
+			self.data[self.sp] = self.ac
+
+		elif op_name == 'POP':
+			self.ac = self.data[self.sp]
+			self.sp += 1
 
 		elif op_name == 'PSHI':
-				pass
+			self.sp -= 1
+			self.data[self.sp] = self.data[arg]
 
 		elif op_name == 'POPI':
-			pass
+			self.data[arg] = self.data[self.sp]
+			self.sp += 1
 
 		elif op_name == 'SWAP':
 			tmp = self.sp 
 			self.sp = self.ac
 			self.ac = tmp
-
-
 
 		elif op_name == 'INSP':
 			#TODO bounds check
@@ -234,41 +242,6 @@ class Mic(object):
 		elif op_name == 'DESP':
 			self.sp -= arg
 
-
-
-
-OPERATIONS = {
-		'LODD' : 0b00000000 , 
-		'STOD' : 0b00010000 ,
-		'LOCO' : 0b01110000 ,
-		'ADDD' : 0b00100000 ,
-		'SUBD' : 0b00110000 ,
-		'JUMP' : 0b01100000 ,
-		'JZER' : 0b01010000 ,
-		'JNEG' : 0b11000000 ,
-		'LODL' : 0b10000000 ,
-		'STOL' : 0b10010000 ,
-		'ADDL' : 0b10100000 ,
-		'SUBL' : 0b10110000 ,
-		'JPOS' : 0b01000000 ,
-		'JNZE' : 0b11010000 ,
-		'CALL' : 0b11100000 ,
-
-		'RETN' : 0b11111000,
-		'PUSH' : 0b11110100,
-		'POP'  : 0b11110110,
-		'PSHI' : 0b11110000,
-		'POPI' : 0b11110010,
-		'SWAP' : 0b11111010,
-		'INSP' : 0b11111010,
-		'DESP' : 0b11111110
-}
-
-"""ins_no_val = [
-		'RETN', 
-		'PUSH',
-		'POP',
-"""
 
 class Instruction(object):
 	def __init__(self,n,label,ins,arg):
@@ -368,7 +341,7 @@ for line in lines:
 
 mic = Mic()
 
-mic.load(MicMemory(data))
+mic.load(data)
 
 mic.run()
 
