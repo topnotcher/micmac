@@ -62,7 +62,7 @@ class Mac(object):
 			'PSHI' : 0b11110000,
 			'POPI' : 0b11110010,
 			'SWAP' : 0b11111010,
-			'INSP' : 0b11111010,
+			'INSP' : 0b11111100,
 			'DESP' : 0b11111110
 	}
 
@@ -295,8 +295,7 @@ class Mic(object):
 				raise InfiniteRecursionException("Infinite recursion detected: depth(%d) >= MAX_DEPTH()." % (self.depth, Mic.MAX_CALL_DEPTH))
 
 			self.desp()
-			# it will be incremented before we run
-			self.data[self.sp] = self.pc
+			self.data[self.sp] = self.pc+1
 			self.pc = arg
 
 
@@ -339,7 +338,7 @@ class Mic(object):
 			self.desp(arg)
 
 
-		#wasnt' a jump instruction
+		# wasn't a jump instruction
 		if self.pc == pc:
 			self.pc += 1
 
@@ -632,15 +631,15 @@ def main():
 
 	pgm = asm.get_pgm()
 
-	if args.baudet:
-		print_baudet(pgm)
-
 	if args.line_numbers:
 		print_numbered(pgm)
 
+	if args.baudet:
+		print_baudet(pgm)
+
+
 	if not args.run:
 		exit(0)
-
 	
 
 	mic = Mic()
@@ -650,17 +649,19 @@ def main():
 	while not mic.end: 
 
 		if args.echo:
+
 			# this is the next line with an instruction in it.
 			next_line = pgm.get_line_by_addr(mic.pc)
 
 			print(next_line)
 
-		try :
+		try:
 			mic.step()
 		except MicMacException as e:
 			print("%s[%d]: %s" % (e.__class__.__name__,next_line.n,str(e)) ,file=sys.stderr)
 			exit(1)
 
+		print(mic.data[0x23])
 if __name__ == '__main__':
 	import traceback,sys
 
