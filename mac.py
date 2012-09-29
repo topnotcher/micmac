@@ -613,11 +613,14 @@ def main():
 
 
 	parser = argparse.ArgumentParser(description='Assemble, debug, simulate programs written in the Mac assembly language for Mic.')
-	parser.add_argument('-f', '--file', type=argparse.FileType('r'),default=sys.stdin, nargs='?', help="Input file for assembler. Defaults to stdin")
-	parser.add_argument('-b', '--baudet', help="Reformat code into 'Baudet' form, suitable for the horrid MicMac simulator", action='store_true')
-	parser.add_argument('-n', '--line-numbers', help="Print line-numbered source code.", action='store_true')
-	parser.add_argument('-r', '--run', help="Run the program", action='store_true')
+
+	parser.add_argument('-o', help="Reformat code into specified output format.", action='append', choices=['baudet','numbered'],default=[] )
+
+	parser.add_argument('-r', '--run', help="Default behavior. Run the program. Cannot be mixed with -o.", action='store_true', default=True)
 	parser.add_argument('-e', '--echo', help="With --run, echo the lines being executed.", action='store_true')
+
+	parser.add_argument('file', type=argparse.FileType('r'), help="Input file for assembler. - for stdin.")
+
 	args = parser.parse_args()
 	asm = MacAsm(args.file)
  
@@ -631,14 +634,14 @@ def main():
 
 	pgm = asm.get_pgm()
 
-	if args.line_numbers:
+	if 'numbered' in args.o:
 		print_numbered(pgm)
 
-	if args.baudet:
+	if 'baudet' in args.o:
 		print_baudet(pgm)
 
 
-	if not args.run:
+	if not args.run or len(args.o) > 0:
 		exit(0)
 	
 
@@ -661,7 +664,9 @@ def main():
 			print("%s[%d]: %s" % (e.__class__.__name__,next_line.n,str(e)) ,file=sys.stderr)
 			exit(1)
 
-		print(mic.data[0x23])
+	print(mic.data[0x23])
+
+
 if __name__ == '__main__':
 	import traceback,sys
 
