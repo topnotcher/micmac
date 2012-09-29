@@ -152,7 +152,7 @@ class MicMemory(object):
 class Mic(object):
 
 	# prevent the stack from growing beyond this address...
-	MAX_SATCK_SIZE = 2048
+	MAX_STACK_SIZE = 2048
 
 	# prevent nesting beyond this level...
 	MAX_CALL_DEPTH = 100
@@ -291,6 +291,7 @@ class Mic(object):
 			self.ac -= self.data[self.sp + arg]
 
 		elif op_name == 'CALL':
+			self.depth += 1
 
 			if self.depth >= Mic.MAX_CALL_DEPTH:
 				raise InfiniteRecursionException("Infinite recursion detected: depth(%d) >= MAX_DEPTH()." % (self.depth, Mic.MAX_CALL_DEPTH))
@@ -411,15 +412,13 @@ class MicProgram(object):
 		return self.lines[line]
 
 	def get_line_by_addr(self,addr):
-		return self.lines[ 
-				self.mmap[addr] 
-				]
+		return self.lines[ self.mmap[addr] ]
 
+	def iter_lines(self):
+		for line in self.lines:
+			yield line
 
 	def __getitem__(self,addr):
-#		print(self.lines)
-#		print(self.mmap)
-
 		return self.lines[ self.mmap[addr] ].op
 		
 	def __setitem__(self,addr,value):
@@ -427,7 +426,6 @@ class MicProgram(object):
 
 	def __len__(self):
 		return len(self.mmap)
-
 
 class MacAsm(object):
 
@@ -567,37 +565,83 @@ class MacAsm(object):
 			self.next_label = None
 
 
-def print_baudet(pgm,line):
+def baudet_remove_label(txt):
+		# see large note below regarding labels
+		pcs = txt.strip().split(None,2)
+		
+		# it's a label
+		if len(pcs) >= 1 and len(pcs[0]) >= 1 and pcs[0][-1] == ':':
+			pcs[0] = ''
+
+		return ' '.join(pcs).strip()
+	
+def print_line_baudet(pgm,line):
 		if line.op is None:
-			print(line.txt)
+			txt = baudet_remove_label(line.txt)
+
+			if len(txt) > 0:
+				print(txt)
 		else:
 			addr = pgm.line_addr_lookup(line)
-			sym = pgm.sym_lookup_reverse(addr)
+			sym = pgm.sym_lookup_reverse(addr) 
 
 			if sym == None:
 				sym = ''
+			else: 
+				sym += ':'
 			
+			# my assembler allows me to put the labels on their own lines
+			# but baudet format has them inline with the "next" instruction
+			# for consistent formatting, I need to see if the line being output
+			# has a label.. etc
+
+			txt = baudet_remove_label(line.txt)
+
 			# disaseembly can be sketchy, so we just add the text to the end.
-			print("%03x %04x %-20s %s" % (addr, line.op, sym, line.txt))
+			print("%03x %04x %-20s %s" % (addr, line.op, sym, txt))
+
+def print_baudet(pgm):
+	for line in pgm.iter_lines():
+
+		print_line_baudet(pgm, line)
+	
 
 
 
-if __name__ == '__main__':
-	print("the mother-fucking main")
+def print_numbered(pgm):
+	for line in pgm.iter_lines():
+		print(line)
 
-	data = sys.stdin
-	asm = MacAsm(data)
+def main():
 
+	import argparse,traceback
+
+
+	parser = argparse.ArgumentParser(description='Assemble, debug, simulate programs written in the Mac assembly language for Mic.')
+	parser.add_argument('-f', '--file', type=argparse.FileType('r'),default=sys.stdin, nargs='?', help="Input file for assembler. Defaults to stdin")
+	parser.add_argument('-b', '--baudet', help="Reformat code into 'Baudet' form, suitable for the horrid MicMac simulator", action='store_true')
+	parser.add_argument('-n', '--line-numbers', help="Print line-numbered source code.", action='store_true')
+	parser.add_argument('-r', '--run', help="Run the program", action='store_true')
+	parser.add_argument('-e', '--echo', help="With --run, echo the lines being executed.", action='store_true')
+	args = parser.parse_args()
+	asm = MacAsm(args.file)
+ 
+	# in every case, we need to assemble the damn thing.
 	try: 
 		asm.assemble()
 
 	except MacAssemblerException as e:
 		print("Assembly failed: %s" % (str(e)), file=sys.stderr)
-		exit()
+		exit(1)
 
 	pgm = asm.get_pgm()
 
-	mic = Mic()
+	if args.baudet:
+		print_baudet(pgm)
+	if args.line_numbers:
+		print_numbered(pgm)
+
+"""	mic = Mic()
 
 	mic.load(pgm)
 
@@ -606,11 +650,29 @@ if __name__ == '__main__':
 		# this is the next line with an instruction in it.
 		next_line = pgm.get_line_by_addr(mic.pc)
 
-		print_baudet(pgm,next_line)
+		print_line_baudet(pgm,next_line)
 
 		try :
 			mic.step()
 		except MicMacException as e:
-			print("%s: %s" % (e.__class__.__name__,str(e)) ,file=sys.stderr)
+			print("%s[%d]: %s" % (e.__class__.__name__,next_line.n,str(e)) ,file=sys.stderr)
+			exit(1)
 
-	print(mic.data[22], mic.ac)
+"""
+if __name__ == '__main__':
+
+	try:
+		main()
+
+	#at leat this looks like I handled the exception...
+	except Exception as e: 
+		print(file=sys.stderr)
+		print('***** MicMac crashed. Python exception follows.',file=sys.stderr)
+		print('--------------------------------------------',file=sys.stderr)
+		print('Type:', e.__class__.__name__,file=sys.stderr)
+		print('Message:', str(e),file=sys.stderr)
+		print(file=sys.stderr)
+		print(traceback.format_exc(),file=sys.stderr)
+		print(file=sys.stderr)
+		exit(1)
+
