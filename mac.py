@@ -35,6 +35,9 @@ class StackUnderflowException(MicException):
 class InfiniteRecursionException(MicException):
 	pass
 
+class ParseError(MacException):
+	pass
+
 
 class Mac(object):
 	OPERATIONS = {
@@ -223,7 +226,7 @@ class Mic(object):
 			raise AddressOutOfBoundsException("Address out of bounds while trying to fetch next instruction: \n > " % (str(e)))
 
 		(op,arg) = Mac.dasm_op(instruction)
-	
+ 		
 		# try to get the textual version of the oepration:
 		
 		op_name = Mac.get_name(op)
@@ -429,11 +432,10 @@ class MacAsm(object):
 	def __init__(self,data):
 		self.data = data
 
-		self.line = 0
+	def get_pgm(self):
+		return self.pgm
 
-		self.next_label = None
-
-		self.pgm = MicProgram()
+	def assemble(self):
 
 		# line : symbol
 		# each time we find a reference toa symbol during phase 1 (tokenizing),
@@ -441,25 +443,34 @@ class MacAsm(object):
 		# during phase 2, we look through the list to resolve the references.
 		self.sym_lookups = {}
 
-	def get_pgm(self):
-		return self.pgm
+		self.pgm = MicProgram()
 
-	def assemble(self):
 
-		self.sym_lookups = {}
+		self.line = 0
+		self.next_label = None
 
+		self.parse_asm()
+
+		self.resolve_labels()
+	
+
+	def parse_asm(self):
 		# pass 1: we go through and tokenize every line.
 		for line in self.data:
 
 			try:
 				self.assemble_line(line)
 			except MacException as e:
-				raise MacAssemblerException( "%s: parse error on line %d: \n > error: %s\n%s" % ( e.__class__.__name__, self.line+1, str(e), line.rstrip() ) )
+				raise MacAssemblerException( "%s: parse error on line %d: \n > error: %s\n%s" % 
+						( e.__class__.__name__, self.line+1, str(e), line.rstrip() )
+					)
 
 			self.line += 1
 
+
+	def resolve_labels(self):
+
 		# pass 2: resolve references to symbols.
-		
 		for line_n in self.sym_lookups:
 			sym = self.sym_lookups[line_n]
 
@@ -467,7 +478,9 @@ class MacAsm(object):
 				sym_val = self.pgm.sym_lookup(sym)
 			except MacException as e:
 				# long cat is long.
-				raise MacAssemblerException( "%s: Error looking up symbol '%s' on line %d:\n > error: %s\n%s" % ( e.__class__.__name__, sym, line_n+1, str(e), self.pgm.get_line(line_n) ) )
+				raise MacAssemblerException( "%s: Error looking up symbol '%s' on line %d:\n > error: %s\n%s" % 
+						( e.__class__.__name__, sym, line_n+1, str(e), self.pgm.get_line(line_n) ) 
+					)
 			
 			# now we have a symbol value, so get the line/op to update.
 			pgm_line = self.pgm.get_line(line_n)
@@ -475,21 +488,34 @@ class MacAsm(object):
 
 			pgm_line.op = Mac.asm_op(op,sym_val)
 
-		self.sym_lookups = {}
 
-	def assemble_line(self,line):
+	def strip_comment(self,line,pgm_line):
+			
+		pcs = line.split(';',1)
+		
+		# any code will be before the ;
+		code = pcs[0].strip()
 
-		line = line.rstrip()
+		# there is a comment.
+		if len(pcs) == 2:
+			# see if there's a dbg command in the comment.
+			pcs = pcs[1].split('dbg_',1)
+			
+			# there is a dbg command.
+			if len(pcs) == 2:
+				pgm_line.dbg_op = pcs[1].strip()
 
-		pgm_line = MicProgramLine(self.line+1, line)
+		if len(code) > 0:
+			return code
 
-		line = line.lstrip()
+		else:
+			return None
 
-
-		# each line has the form:
-		#label: OP ARG whitsp/comment.
-
-		toks = line.split(None,3)
+	def tokenize_code(self,code,pgm_line):
+	
+		# none = default of all whitespace.
+		# yeah, tht's fucking stupid and cryptic of me.
+		toks = code.split(None,2)
 			
 		i = 0
 
@@ -498,19 +524,13 @@ class MacAsm(object):
 
 		for tok in toks:
 
-			# this is an instruction for the debugger...
-			if tok.startswith(';dbg_'):
-				break;
-
-			# the rest of the line is a comment.
-			elif tok.startswith(';'):
-				break
-
-			elif tok.endswith(':'):
+			# a label 
+			if tok.endswith(':'):
 
 				if i != 0:
-					raise Exception("Unexpected label at pos %d" % i)
+					raise ParseError("Unexpected label.  There can only be one label per line and it must be the first token.")
 		
+				# assign this label to the next op (this line, or next line with an op)
 				self.next_label = tok[0:-1]
 
 			# it's not a label, it's not a whitespace/comment and there's no op yet.
@@ -545,12 +565,26 @@ class MacAsm(object):
 			else:
 				arg = int(arg)
 
-			#print(line)
-			#print(op.__class__.__name__,arg.__class__.__name__)
-			#print("%s %s" % (str(op),str(arg)))
 			# now we can assemble the op, update the line.
 			pgm_line.op = Mac.asm_op(op,arg)
 
+
+	def assemble_line(self,line):
+
+		line = line.rstrip()
+
+		pgm_line = MicProgramLine(self.line+1, line)
+
+		# do this after to preserve indenting.
+		line = line.lstrip()
+
+		code = self.strip_comment(line,pgm_line)
+
+		# each line has the form:
+		#label: OP ARG whitsp/comment.
+
+		if code is not None:
+			self.tokenize_code(code,pgm_line)
 
 		# now add the line to the program.
 		addr = self.pgm.add_line(pgm_line)
@@ -560,6 +594,7 @@ class MacAsm(object):
 		if addr is not None and self.next_label is not None:
 			self.pgm.add_sym(self.next_label, addr)
 			self.next_label = None
+
 
 
 def baudet_remove_label(txt):
@@ -608,6 +643,12 @@ def print_numbered(pgm):
 		print(line)
 
 
+# break 
+# jump 
+# view registers: ac, pc, sp.
+# view stack.
+# run arbitrary code?
+
 class ConsoleDebugger(object):
 	import sys
 
@@ -626,7 +667,7 @@ class ConsoleDebugger(object):
 				# this is the next line with an instruction in it.
 				next_line = self.pgm.get_line_by_addr(self.mic.pc)
 
-				for i in range(
+#				for i in range(
 
 				print(next_line)
 
