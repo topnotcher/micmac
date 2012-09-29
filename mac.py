@@ -607,6 +607,35 @@ def print_numbered(pgm):
 	for line in pgm.iter_lines():
 		print(line)
 
+
+class ConsoleDebugger(object):
+	import sys
+
+	def __init__(self,pgm,echo = False):
+
+		self.mic =  Mic()
+		self.mic.load(pgm)
+		self.pgm = pgm
+		self.echo = echo
+
+	def run(self):
+		while not self.mic.end: 
+
+			if self.echo:
+
+				# this is the next line with an instruction in it.
+				next_line = self.pgm.get_line_by_addr(self.mic.pc)
+
+				for i in range(
+
+				print(next_line)
+
+			try:
+				self.mic.step()
+			except MicMacException as e:
+				print("%s[%d]: %s" % (e.__class__.__name__,next_line.n,str(e)) ,file=sys.stderr)
+				exit(1)
+
 def main():
 
 	import argparse,sys
@@ -640,31 +669,17 @@ def main():
 	if 'baudet' in args.o:
 		print_baudet(pgm)
 
-
+	#dont invoke the debugger if 
 	if not args.run or len(args.o) > 0:
 		exit(0)
 	
+	dbg = ConsoleDebugger(pgm, echo=args.echo)
 
-	mic = Mic()
 
-	mic.load(pgm)
+	dbg.run()
 
-	while not mic.end: 
-
-		if args.echo:
-
-			# this is the next line with an instruction in it.
-			next_line = pgm.get_line_by_addr(mic.pc)
-
-			print(next_line)
-
-		try:
-			mic.step()
-		except MicMacException as e:
-			print("%s[%d]: %s" % (e.__class__.__name__,next_line.n,str(e)) ,file=sys.stderr)
-			exit(1)
-
-	print(mic.data[0x23])
+	#run the debugger
+#	print(mic.data[0x23])
 
 
 if __name__ == '__main__':
