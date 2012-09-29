@@ -29,10 +29,10 @@ main:
 fibonacci:
 	LODL	2
 
-	; AC = N - 3
+	; AC = N - 3 dbg_print N
 	SUBD	three
 
-	; if AC < 0... (N-3<0 => N < 3)
+	; if AC < 0... (N-3<0 => N < 3) dbg_print N
 	JNEG	return1
 
 	; else (we didn't jump)
@@ -48,7 +48,9 @@ fibonacci:
 
 	; allocate space for return value.
 	PUSH
-
+	
+	; dbg_break
+	
 	CALL	fibonacci
 
 	; After call:
