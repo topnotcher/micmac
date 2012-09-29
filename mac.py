@@ -658,24 +658,41 @@ class ConsoleDebugger(object):
 		self.mic.load(pgm)
 		self.pgm = pgm
 		self.echo = echo
+		self.paused = False
 
 	def run(self):
+		
+		last_line = -1
+
 		while not self.mic.end: 
+			# this is the next line with an instruction in it.
+			# 	- also the line being executed this iteration.
+			next_line = self.pgm.get_line_by_addr(self.mic.pc)
 
-			if self.echo:
+			for i in range(last_line+1, next_line.n):
+				pgm_line = self.pgm.get_line(i)
 
-				# this is the next line with an instruction in it.
-				next_line = self.pgm.get_line_by_addr(self.mic.pc)
+				if self.echo:
+					print(pgm_line)
 
-#				for i in range(
+			#print(next_line)
 
-				print(next_line)
+			last_line = next_line.n-1
 
 			try:
+				pc = self.mic.pc 
+
 				self.mic.step()
+				
+				# sort of hackish way to detect a jump.
+				if self.mic.pc - pc != 1:
+					# if there's a jump, reset the last line printed...
+					last_line = self.pgm.get_line_by_addr(self.mic.pc).n-1
 			except MicMacException as e:
 				print("%s[%d]: %s" % (e.__class__.__name__,next_line.n,str(e)) ,file=sys.stderr)
 				exit(1)
+
+			# when we end 
 
 def main():
 
