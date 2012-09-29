@@ -1,7 +1,5 @@
 #!/usr/bin/python
 
-import sys
-
 class MicMacException(Exception):
 	pass
 
@@ -606,15 +604,13 @@ def print_baudet(pgm):
 		print_line_baudet(pgm, line)
 	
 
-
-
 def print_numbered(pgm):
 	for line in pgm.iter_lines():
 		print(line)
 
 def main():
 
-	import argparse,traceback
+	import argparse,sys
 
 
 	parser = argparse.ArgumentParser(description='Assemble, debug, simulate programs written in the Mac assembly language for Mic.')
@@ -638,19 +634,26 @@ def main():
 
 	if args.baudet:
 		print_baudet(pgm)
+
 	if args.line_numbers:
 		print_numbered(pgm)
 
-"""	mic = Mic()
+	if not args.run:
+		exit(0)
+
+	
+
+	mic = Mic()
 
 	mic.load(pgm)
 
 	while not mic.end: 
 
-		# this is the next line with an instruction in it.
-		next_line = pgm.get_line_by_addr(mic.pc)
+		if args.echo:
+			# this is the next line with an instruction in it.
+			next_line = pgm.get_line_by_addr(mic.pc)
 
-		print_line_baudet(pgm,next_line)
+			print(next_line)
 
 		try :
 			mic.step()
@@ -658,8 +661,8 @@ def main():
 			print("%s[%d]: %s" % (e.__class__.__name__,next_line.n,str(e)) ,file=sys.stderr)
 			exit(1)
 
-"""
 if __name__ == '__main__':
+	import traceback,sys
 
 	try:
 		main()

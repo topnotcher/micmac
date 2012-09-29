@@ -42,7 +42,7 @@ fibonacci:
 	JUMP	fibonacci
 
 Stop:
-	JUMP	Stop
+	JUMP	Stop ;dbg_print,DEFN
 
 two:	DEFN	2
 one:	DEFN	1
