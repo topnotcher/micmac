@@ -671,6 +671,9 @@ class ConsoleDebugger(object):
 
 			for i in range(last_line+1, next_line.n):
 				pgm_line = self.pgm.get_line(i)
+			
+				if pgm_line.dbg_op is not None:
+					self.dbg_op(pgm_line.dbg_op, pgm_line)
 
 				if self.echo:
 					print(pgm_line)
@@ -681,6 +684,9 @@ class ConsoleDebugger(object):
 
 			try:
 				pc = self.mic.pc 
+				
+				if self.paused:
+					self.console()
 
 				self.mic.step()
 				
@@ -692,7 +698,44 @@ class ConsoleDebugger(object):
 				print("%s[%d]: %s" % (e.__class__.__name__,next_line.n,str(e)) ,file=sys.stderr)
 				exit(1)
 
-			# when we end 
+	def console(self):
+
+		while True:
+			print('> ',end='')
+			sys.stdout.flush()
+			
+			if self.dbg_op( sys.stdin.readline() ):
+				return
+
+			if  not self.paused:
+				return
+
+	def dbg_op(self,cmd_line,pgm_line = None):
+
+		toks = cmd_line.split()
+
+		cmd = toks[0]
+
+		if pgm_line is not None:
+			print('DEBUG[%d]: %s' % (pgm_line.n, pgm_line.dbg_op))
+
+		if cmd == 'break':
+			self.paused = True
+
+		elif cmd == 'run':
+			self.paused = False
+			return True
+
+		elif cmd == 'step':
+			return True
+	
+		#elif cmd == 'print':
+			
+
+
+
+		return False
+			
 
 def main():
 
