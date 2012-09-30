@@ -293,7 +293,7 @@ class Mic(object):
 			self.depth += 1
 
 			if self.depth >= Mic.MAX_CALL_DEPTH:
-				raise InfiniteRecursionException("Infinite recursion detected: depth(%d) >= MAX_DEPTH()." % (self.depth, Mic.MAX_CALL_DEPTH))
+				raise InfiniteRecursionException("Infinite recursion detected: depth(%d) >= MAX_DEPTH(%d)." % (self.depth, Mic.MAX_CALL_DEPTH))
 
 			self.desp()
 			self.data[self.sp] = self.pc+1
