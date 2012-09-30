@@ -41,24 +41,24 @@ class ParseError(MacException):
 
 class Mac(object):
 	OPERATIONS = {
-			'LODD' : 0b00000000 , 
+			'LODD' : 0b00000000, 
 
 			 # placeholder for defining variables
-			'DEFN' : 0b00000000 ,
-			'STOD' : 0b00010000 ,
-			'LOCO' : 0b01110000 ,
-			'ADDD' : 0b00100000 ,
-			'SUBD' : 0b00110000 ,
-			'JUMP' : 0b01100000 ,
-			'JZER' : 0b01010000 ,
-			'JNEG' : 0b11000000 ,
-			'LODL' : 0b10000000 ,
-			'STOL' : 0b10010000 ,
-			'ADDL' : 0b10100000 ,
-			'SUBL' : 0b10110000 ,
-			'JPOS' : 0b01000000 ,
-			'JNZE' : 0b11010000 ,
-			'CALL' : 0b11100000 ,
+			'DEFN' : 0b00000000,
+			'STOD' : 0b00010000,
+			'LOCO' : 0b01110000,
+			'ADDD' : 0b00100000,
+			'SUBD' : 0b00110000,
+			'JUMP' : 0b01100000,
+			'JZER' : 0b01010000,
+			'JNEG' : 0b11000000,
+			'LODL' : 0b10000000,
+			'STOL' : 0b10010000,
+			'ADDL' : 0b10100000,
+			'SUBL' : 0b10110000,
+			'JPOS' : 0b01000000,
+			'JNZE' : 0b11010000,
+			'CALL' : 0b11100000,
 			'RETN' : 0b11111000,
 			'PUSH' : 0b11110100,
 			'POP'  : 0b11110110,
@@ -268,11 +268,9 @@ class Mic(object):
 			if self.ac < 0:
 				self.pc = arg
 
-
 		elif op_name == 'JPOS':
 			if self.ac >= 0:
 				self.pc = arg
-
 				
 		elif op_name == 'JNZE':
 			if self.ac != 0:
@@ -300,8 +298,6 @@ class Mic(object):
 			self.desp()
 			self.data[self.sp] = self.pc+1
 			self.pc = arg
-
-
 
 		elif op_name == 'RETN':
 			self.depth -= 1
