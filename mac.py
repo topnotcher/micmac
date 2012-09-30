@@ -495,6 +495,7 @@ class MacAsm(object):
 
 		# there is a comment.
 		if len(pcs) == 2:
+
 			# see if there's a dbg command in the comment.
 			pcs = pcs[1].split('dbg_',1)
 			
@@ -739,16 +740,11 @@ class ConsoleDebugger(object):
 			if len(args) != 1:
 				print("print requires exactly 1 argument")
 
-			# a label....
-			if not args[0].isnumeric():
-				try: 
-					addr = self.pgm.sym_lookup(args[0])
-				except UndefinedLabelException:
-					print("*** symbol '%s' not found" % args[0])
-					return
-				
-			else:
-				addr = int(args[0])
+			addr = self.resolve_addr(args[0])
+
+			if addr is None:
+				print('Undefined label: "%s"' % (addr))
+				return
 
 			try:
 				value = self.mic.data[addr]
@@ -761,8 +757,35 @@ class ConsoleDebugger(object):
 
 		elif cmd == 'exit':
 			exit(0)
+
+
+		elif cmd == 'input':
+			if len(args) != 2:
+				print('input requries two arguments')
+				return;
+
+			addr = self.resolve_addr(args[0])
+
+			if addr is None:
+				print('Undefined label: "%s"' % (addr))
+				return
+
+			self.mic.data[addr] = int(args[1])
+		
+
 		return False
-			
+	
+
+	def resolve_addr(self,arg):
+			# a label....
+		if not arg.isnumeric():
+			try: 
+				return self.pgm.sym_lookup(arg)
+			except UndefinedLabelException:
+				return None
+				
+		else:
+			return int(args)
 
 def main():
 

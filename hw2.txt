@@ -1,4 +1,6 @@
 Main:
+	; dbg_break to input N
+
 	LODD	N
 
 	; assume that input n>=1. (n==0 should return 0. < 0 is undefined)
@@ -9,9 +11,8 @@ Main:
 	; f(1): if n - 2 < 0, then n==1, so result == 1 
 	JNEG	Stop
 
-fibonacci: LODD	N
-
-	; dbg_break
+fibonacci:
+	LODD	N
 
 	; similarly: f(2) = 1. 
 	; Also handles when N decrements sufficiently 
