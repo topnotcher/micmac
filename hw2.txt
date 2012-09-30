@@ -9,9 +9,9 @@ Main:
 	; f(1): if n - 2 < 0, then n==1, so result == 1 
 	JNEG	Stop
 
-fibonacci:	
+fibonacci: LODD	N
 
-	LODD	N
+	; dbg_break
 
 	; similarly: f(2) = 1. 
 	; Also handles when N decrements sufficiently 
@@ -42,7 +42,7 @@ fibonacci:
 	JUMP	fibonacci
 
 Stop:
-	JUMP	Stop ;dbg_print,DEFN
+	JUMP	Stop ; dbg_print Result
 
 two:	DEFN	2
 one:	DEFN	1

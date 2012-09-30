@@ -378,6 +378,7 @@ class MicProgram(object):
 		self.syms[name] = addr
 
 	def sym_lookup(self,name):
+
 		if name not in self.syms:
 			raise UndefinedLabelException("undefined label '%s'" % name)
 
@@ -693,7 +694,8 @@ class ConsoleDebugger(object):
 				# sort of hackish way to detect a jump.
 				if self.mic.pc - pc != 1:
 					# if there's a jump, reset the last line printed...
-					last_line = self.pgm.get_line_by_addr(self.mic.pc).n-1
+					last_line = self.pgm.get_line_by_addr(self.mic.pc).n-2
+
 			except MicMacException as e:
 				print("%s[%d]: %s" % (e.__class__.__name__,next_line.n,str(e)) ,file=sys.stderr)
 				exit(1)
@@ -716,6 +718,11 @@ class ConsoleDebugger(object):
 
 		cmd = toks[0]
 
+		if len(toks) > 1:
+			args = tuple(toks[1:])
+		else:
+			args = ()
+	
 		if pgm_line is not None:
 			print('DEBUG[%d]: %s' % (pgm_line.n, pgm_line.dbg_op))
 
@@ -729,11 +736,32 @@ class ConsoleDebugger(object):
 		elif cmd == 'step':
 			return True
 	
-		#elif cmd == 'print':
-			
+		elif cmd == 'print':
+			if len(args) != 1:
+				print("print requires exactly 1 argument")
+
+			# a label....
+			if not args[0].isnumeric():
+				try: 
+					addr = self.pgm.sym_lookup(args[0])
+				except UndefinedLabelException:
+					print("*** symbol '%s' not found" % args[0])
+					return
+				
+			else:
+				addr = int(args[0])
+
+			try:
+				value = self.mic.data[addr]
+			except AddressOutOfBoundsException:
+				print("*** address %d out of bounds" % (addr))
+				return
+
+			print('M[{:s}, 0x{:04x}] = {:5d}, 0x{:04x}, 0b{:016b}'.format(args[0],addr,value,value,value))
 
 
-
+		elif cmd == 'exit':
+			exit(0)
 		return False
 			
 
