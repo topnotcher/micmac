@@ -716,6 +716,9 @@ class ConsoleDebugger(object):
 
 		toks = cmd_line.split()
 
+		if len(toks) < 1:
+			return False
+
 		cmd = toks[0]
 
 		if len(toks) > 1:
