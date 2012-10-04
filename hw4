@@ -2,6 +2,8 @@ main:
 	; load the address of the root node 
 	LOCO root
 
+	; dbg_print ac
+
 	; PUSH address of root node onto stack.
 	PUSH
 
@@ -14,16 +16,18 @@ main:
 	POP
 
 	; store it in result 
-	STOD result ; dbg_print result
+	STOD result 
+
+	done: JUMP done ; dbg_print result
 	
 count:
 	; stack:
 	; 0 return addr 
 	; 1 return value
 	; 2 arg
-	
-	; Set return value to 1 (count this node)
+
 	LOCO 1 
+	; set return value to 1 (count this node)
 	STOL 1 
 
 	; if there's a left branch, add its size
@@ -33,16 +37,42 @@ count:
 		; load the argument
 		LODL 2
 		
-		; left branch 
-		ADDD one 
+		;dbg_print ac
 
+		; ac contains the address of the address of a node, e.g.
+		; M[AC] = node value
+		; M[AC+1] = address of left branch
+		; M[AC+2] = address of right branch
+
+		; now M[AC] = address of left branch.
+		ADDD one 
+		
+		;dbg_print ac
+
+		; PSHI => M[++SP] = M[AC]
+		PSHI 
+
+		; now pop off
+		POP
+
+		; AC = address of left branch
+
+		; dbg_print ac
 		JNZE add_left
 
 	; likewise for the right
+	; (jumped here from add_left or did not jump TO add_left)
 	check_right:
 		LODL 2
 
+		;dbg_print ac
 		ADDD two
+
+		PSHI
+		
+		POP
+
+		;dbg_print ac
 
 		JNZE add_right 
 
@@ -52,8 +82,7 @@ count:
 
 	; prior to jumping to either
 	; add_left or add_right,
-	; the accumulator is set to the address of the
-	; branch we need to check
+	; AC = the address of the node to check
 	add_left:
 		
 		; PUSH the address onto the stack 
@@ -66,15 +95,28 @@ count:
 	
 		; POP the return value off
 		POP
+		
+		; deallocate space used for the arg.
+		INSP 1
 
 		; add it to this FN's return value.
 		ADDL 1 
 	
+		; Store it back in the return value.
+		STOL 1
+
 		; now check the right.
 		JUMP check_right
 
 	add_right: 
 		
+		; called ra
+		; called rv 
+		; called arg
+		; my ra
+ 		; my rv
+		; my arg 
+
 		; PUSH the address onto the stack 
 		PUSH
 
@@ -86,13 +128,20 @@ count:
 		; POP the return value off
 		POP
 
+		; sp = called arg
+
+		; deallocate space used for the arg
+		INSP 1
+
 		; add it to this FN's return value.
 		ADDL 1 
 	
+		; Store it back in the return value.
+		STOL 1
+
+		; dbg_print AC
 
 	RETN
-
-	; RETURN 1 + count(left) + count(right) 
 
 
 one: DEFN 1

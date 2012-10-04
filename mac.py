@@ -90,6 +90,7 @@ class Mac(object):
 
 		# other opartions. The op is 4 bits, arg 12.
 		else:
+			# TODO fucking mask it.
 			# dont mask arg because in the case of a defined constant,
 			# the data is the whole thing. 
 			return (op&0xf0)<<8 | (arg)
@@ -242,7 +243,10 @@ class Mic(object):
 			self.data[arg] = self.ac
 
 		elif op_name == 'LOCO':
+#			print("ARGUMENT: 0x%04x" % arg)
+			# hack
 			self.ac = arg
+#			print("AC: 0x%04x" %arg )
 
 		elif op_name == 'ADDD':
 			self.ac += self.data[arg]
@@ -319,7 +323,7 @@ class Mic(object):
 
 		elif op_name == 'PSHI':
 			self.desp()
-			self.data[self.sp] = self.data[arg]
+			self.data[self.sp] = self.data[self.ac]
 
 		elif op_name == 'POPI':
 			self.data[arg] = self.data[self.sp]
@@ -739,18 +743,27 @@ class ConsoleDebugger(object):
 		elif cmd == 'print':
 			if len(args) != 1:
 				print("print requires exactly 1 argument")
-
+		
+			value = None
 			addr = self.resolve_addr(args[0])
+		
+#			print("PRINT AC: 0x%04x" % self.mic.ac)
+		
+			# stupid hack...
+			if args[0] == 'ac':
+				addr = 0
+				value = self.mic.ac
+			else: 
 
-			if addr is None:
-				print('Undefined label: "%s"' % (addr))
-				return
+				if addr is None:
+					print('Undefined label: "%s"' % (addr))
+					return
 
-			try:
-				value = self.mic.data[addr]
-			except AddressOutOfBoundsException:
-				print("*** address %d out of bounds" % (addr))
-				return
+				try:
+					value = self.mic.data[addr]
+				except AddressOutOfBoundsException:
+					print("*** address %d out of bounds" % (addr))
+					return
 
 			print('M[{:s}, 0x{:04x}] = {:5d}, 0x{:04x}, 0b{:016b}'.format(args[0],addr,value,value,value))
 
