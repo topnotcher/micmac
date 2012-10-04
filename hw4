@@ -1,0 +1,140 @@
+main:
+	; load the address of the root node 
+	LOCO root
+
+	; PUSH address of root node onto stack.
+	PUSH
+
+	; Allocate space for return value.
+	PUSH
+
+	CALL count
+
+	; pop off the return value.
+	POP
+
+	; store it in result 
+	STOD result ; dbg_print result
+	
+count:
+	; stack:
+	; 0 return addr 
+	; 1 return value
+	; 2 arg
+	
+	; Set return value to 1 (count this node)
+	LOCO 1 
+	STOL 1 
+
+	; if there's a left branch, add its size
+	; to the return value
+	check_left:
+	
+		; load the argument
+		LODL 2
+		
+		; left branch 
+		ADDD one 
+
+		JNZE add_left
+
+	; likewise for the right
+	check_right:
+		LODL 2
+
+		ADDD two
+
+		JNZE add_right 
+
+	
+	; else return 
+	RETN  
+
+	; prior to jumping to either
+	; add_left or add_right,
+	; the accumulator is set to the address of the
+	; branch we need to check
+	add_left:
+		
+		; PUSH the address onto the stack 
+		PUSH
+
+		; Allocate space for return value
+		PUSH
+
+		CALL count
+	
+		; POP the return value off
+		POP
+
+		; add it to this FN's return value.
+		ADDL 1 
+	
+		; now check the right.
+		JUMP check_right
+
+	add_right: 
+		
+		; PUSH the address onto the stack 
+		PUSH
+
+		; Allocate space for return value
+		PUSH
+
+		CALL count
+	
+		; POP the return value off
+		POP
+
+		; add it to this FN's return value.
+		ADDL 1 
+	
+
+	RETN
+
+	; RETURN 1 + count(left) + count(right) 
+
+
+one: DEFN 1
+two: DEFN 2
+result: DEFN 0
+
+; a test binary tree
+root:
+	DEFN 1
+	DEFN node2
+	DEFN node3
+
+; left branch.
+node2:
+	DEFN 1
+	DEFN node4
+	DEFN node5
+
+; right branch.
+node3: 
+	DEFN 1
+	DEFN node6
+	DEFN node7
+
+node4: 
+	DEFN 1
+	DEFN 0
+	DEFN 0
+
+node5: 
+	DEFN 1
+	DEFN 0
+	DEFN 0
+
+node6: 
+	DEFN 1
+	DEFN 0
+	DEFN 0
+
+node7: 
+	DEFN 1
+	DEFN 0
+	DEFN 0
+
+
