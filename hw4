@@ -22,20 +22,40 @@ main:
 	
 count:
 	; stack:
-	; 0 return addr 
-	; 1 return value
-	; 2 arg
+	;	0 = local1
+	;	1 = return addr
+	;	2 = return value
+	;	3 = my arg
 
-	LOCO 1 
+	; local variable: number of branches to check
+	; (e.g. iterate "foreach branch")
+	; M[--SP] = 2
+	LODD two
+	PUSH 
+
 	; set return value to 1 (count this node)
-	STOL 1 
+	; M[SP+2] = 1
+	LODD one 
+	STOL 2
 
-	; if there's a left branch, add its size
-	; to the return value
-	check_left:
+	; if there are branches left to check,
+	; add the size of teh branch to the return value
+	check_branch:
+
+		; M[SP] in {2,1,0}
+		LODL 0
 	
+		; dbg_print ac
+		; no branches left.
+		JZER return
+		
+		; otherwise (note we checked a branch)
+		; M[--SP] = AC-1
+		SUBD one
+		STOL 0
+			
 		; load the argument
-		LODL 2
+		LODL 3
 		
 		;dbg_print ac
 
@@ -45,45 +65,29 @@ count:
 		; M[AC+2] = address of right branch
 
 		; now M[AC] = address of left branch.
+		; AC = M[SP+3] += 1
 		ADDD one 
-		
+		STOL 3
+
 		;dbg_print ac
 
-		; PSHI => M[++SP] = M[AC]
-		PSHI 
-
-		; now pop off
+		; PSHI => M[--SP] = M[AC]
+		; e.g. dereference the pointer
+		PSHI
 		POP
 
 		; AC = address of left branch
 
 		; dbg_print ac
-		JNZE add_left
+		JNZE add_branch
 
-	; likewise for the right
-	; (jumped here from add_left or did not jump TO add_left)
-	check_right:
-		LODL 2
-
-		;dbg_print ac
-		ADDD two
-
-		PSHI
-		
-		POP
-
-		;dbg_print ac
-
-		JNZE add_right 
-
-	
-	; else return 
-	RETN  
+		; check next branch, if any
+		JUMP check_branch
 
 	; prior to jumping to either
 	; add_left or add_right,
 	; AC = the address of the node to check
-	add_left:
+	add_branch:
 		
 		; PUSH the address onto the stack 
 		PUSH
@@ -94,54 +98,24 @@ count:
 		CALL count
 	
 		; POP the return value off
-		POP
+		POP 
 		
 		; deallocate space used for the arg.
 		INSP 1
 
 		; add it to this FN's return value.
-		ADDL 1 
+		ADDL 2
 	
 		; Store it back in the return value.
-		STOL 1
+		STOL 2
 
-		; now check the right.
-		JUMP check_right
+		; now check the next branch (if any).
+		JUMP check_branch
 
-	add_right: 
-		
-		; called ra
-		; called rv 
-		; called arg
-		; my ra
- 		; my rv
-		; my arg 
-
-		; PUSH the address onto the stack 
-		PUSH
-
-		; Allocate space for return value
-		PUSH
-
-		CALL count
-	
-		; POP the return value off
+	return: 
+		; discard my local
 		POP
-
-		; sp = called arg
-
-		; deallocate space used for the arg
-		INSP 1
-
-		; add it to this FN's return value.
-		ADDL 1 
-	
-		; Store it back in the return value.
-		STOL 1
-
-		; dbg_print AC
-
-	RETN
+		RETN
 
 
 one: DEFN 1
